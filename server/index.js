@@ -276,7 +276,7 @@ FORMATTING RULES:
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`\n🚀 Eleveto Scraper Server → http://localhost:${PORT}`);
-    console.log(`   Health check: http://localhost:${PORT}/api/health\n`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 Eleveto Scraper Server → http://0.0.0.0:${PORT}`);
+    console.log(`   Health check: http://0.0.0.0:${PORT}/api/health\n`);
 });
