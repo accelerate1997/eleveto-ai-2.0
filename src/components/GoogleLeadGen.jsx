@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, MapPin, Briefcase, Sliders, Zap, Loader2 } from 'lucide-react';
 import GoogleLeadResults from './GoogleLeadResults';
 
-const SERVER_URL = 'http://192.168.1.134:3001';
+const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function GoogleLeadGen() {
     const [form, setForm] = useState({

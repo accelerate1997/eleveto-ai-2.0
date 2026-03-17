@@ -124,7 +124,8 @@ const LandingPage = ({ onLoginClick }) => {
         setTerminalOutput(prev => [...prev, { type: 'system', text: 'Analyzing business bottleneck via ElevetoAi Hub...' }]);
 
         try {
-            const res = await fetch('http://192.168.1.134:3001/api/public/landing-ai', {
+            const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+            const res = await fetch(`${apiBase}/api/public/landing-ai`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ problem })

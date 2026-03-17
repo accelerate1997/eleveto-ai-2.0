@@ -6,7 +6,8 @@ import puppeteer from 'puppeteer';
 import OpenAI from 'openai';
 import * as dotenv from 'dotenv';
 
-dotenv.config({ path: '../.env' });
+dotenv.config({ path: '../.env' }); // Fallback to local .env if present
+// Process environment variables will already be populated by Docker/Compose
 
 // Initialize OpenAI (Requires OPENAI_API_KEY in .env)
 const openai = new OpenAI();
