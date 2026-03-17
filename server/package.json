@@ -1,0 +1,19 @@
+{
+    "name": "eleveto-scraper-server",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Local Express API for Google Maps scraping",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dotenv": "^17.3.1",
+        "express": "^4.19.2",
+        "express-rate-limit": "^8.3.1",
+        "helmet": "^8.1.0",
+        "openai": "^6.27.0",
+        "puppeteer": "^22.0.0"
+    }
+}

@@ -1,0 +1,38 @@
+ <!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ElevetoAi | Autonomous OS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Cal.com embed code begins -->
+    <script type="text/javascript">
+      (function (C, A, L) {
+        let p = function (a, ar) {
+          a.q.push(ar);
+        };
+        let d = C.document;
+        C.Cal =
+          C.Cal ||
+          function () {
+            let cal = C.Cal;
+            let ar = arguments;
+            if (!cal.q) {
+              cal.q = [];
+            }
+            if (ar[0] === L) {
+              p(cal, ar);
+              return;
+            }
+            p(cal, ar);
+          };
+      })(window, "https://app.cal.com/embed/embed.js", "init");
+      Cal("init", { origin: "https://app.cal.com" });
+    </script>
+    <!-- Cal.com embed code ends -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
