@@ -16,7 +16,7 @@ services:
       - "traefik.http.routers.frontend-router.rule=Host(`elevetoai.com`) || Host(`www.elevetoai.com`)"
       - "traefik.http.routers.frontend-router.entrypoints=websecure"
       - "traefik.http.routers.frontend-router.tls=true"
-      - "traefik.http.routers.frontend-router.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-router.priority=1"
       - "traefik.http.services.frontend-service.loadbalancer.server.port=5173"
     restart: always
     deploy:
@@ -37,10 +37,10 @@ services:
       - PORT=3001
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend-router.rule=Host(`api-eleveto.31.97.231.139.sslip.io`)"
+      - "traefik.http.routers.backend-router.rule=(Host(`elevetoai.com`) || Host(`www.elevetoai.com`)) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend-router.entrypoints=websecure"
       - "traefik.http.routers.backend-router.tls=true"
-      - "traefik.http.routers.backend-router.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-router.priority=10"
       - "traefik.http.services.backend-service.loadbalancer.server.port=3001"
     restart: always
     deploy:
