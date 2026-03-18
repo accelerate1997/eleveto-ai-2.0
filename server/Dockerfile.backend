@@ -30,8 +30,16 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 COPY package*.json ./
+# Tell Puppeteer to download Chrome to the app directory
+ENV PUPPETEER_CACHE_DIR=/app/.cache
 RUN npm install
 COPY . .
+
+# Explicitly install Chrome to ensure it's present
+RUN npx puppeteer browsers install chrome
+
+# Give the non-root node user permission to read the downloaded browser
+RUN chown -R node:node /app
 
 # Set environment variable for Puppeteer
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
