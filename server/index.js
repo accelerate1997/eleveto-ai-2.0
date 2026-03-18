@@ -44,9 +44,15 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({ 
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || 
+            origin.startsWith('http://localhost') || 
+            origin.startsWith('https://localhost') || 
+            origin.startsWith('capacitor://') || 
+            origin.startsWith('file://') ||
+            allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
+            console.error(`[CORS Error] Blocked Origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
