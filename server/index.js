@@ -28,15 +28,19 @@ const limiter = rateLimit({
 });
 
 // Dynamic CORS configuration
+const defaultOrigins = [
+    'http://localhost',
+    'capacitor://localhost',
+    'http://localhost:5173', 
+    'http://localhost:5174', 
+    'http://localhost:5175',
+    'https://elevetoai.com',
+    'https://api-eleveto.31.97.231.139.sslip.io'
+];
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',') 
-    : [
-        'http://localhost:5173', 
-        'http://localhost:5174', 
-        'http://localhost:5175',
-        'https://elevetoai.com',
-        'https://api-eleveto.31.97.231.139.sslip.io'
-    ];
+    ? [...new Set([...process.env.ALLOWED_ORIGINS.split(','), ...defaultOrigins])]
+    : defaultOrigins;
 
 app.use(cors({ 
     origin: (origin, callback) => {
