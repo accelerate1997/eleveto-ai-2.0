@@ -4,9 +4,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 ARG VITE_PB_URL
-ARG VITE_API_URL
 ENV VITE_PB_URL=$VITE_PB_URL
-ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Switch to Nginx for serving SPA and proxying API

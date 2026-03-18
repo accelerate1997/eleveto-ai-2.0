@@ -5,12 +5,10 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         - VITE_PB_URL=${VITE_PB_URL}
-        - VITE_API_URL=${VITE_API_URL}
     ports:
       - "80:80"
     environment:
       - VITE_PB_URL=${VITE_PB_URL}
-      - VITE_API_URL=${VITE_API_URL}
     restart: always
     deploy:
       resources:
