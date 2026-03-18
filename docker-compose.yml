@@ -6,7 +6,7 @@ services:
       args:
         - VITE_PB_URL=${VITE_PB_URL}
     ports:
-      - "80:80"
+      - "5173:80"
     environment:
       - VITE_PB_URL=${VITE_PB_URL}
     restart: always
