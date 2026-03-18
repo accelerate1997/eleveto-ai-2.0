@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, MapPin, Briefcase, Sliders, Zap, Loader2 } from 'lucide-react';
 import GoogleLeadResults from './GoogleLeadResults';
 
-const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = import.meta.env.VITE_API_URL || '';
 
 export default function GoogleLeadGen() {
     const [form, setForm] = useState({
@@ -38,12 +38,12 @@ export default function GoogleLeadGen() {
 
         try {
             // Check server health first
-            const health = await fetch(`${SERVER_URL}/api/health`).catch(() => null);
+            const health = await fetch(`${apiBase}/api/health`).catch(() => null);
             if (!health || !health.ok) {
                 throw new Error('Scraper server is not running. Please start the server with: cd server && npm start');
             }
 
-            const res = await fetch(`${SERVER_URL}/api/scrape`, {
+            const res = await fetch(`${apiBase}/api/scrape`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

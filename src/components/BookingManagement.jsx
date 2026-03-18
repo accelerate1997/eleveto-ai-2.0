@@ -70,7 +70,8 @@ export default function BookingManagement() {
 
         setIsSyncing(true);
         try {
-            const response = await fetch('http://localhost:3001/api/integrations/cal/sync', {
+            const apiBase = import.meta.env.VITE_API_URL || '';
+            const response = await fetch(`${apiBase}/api/integrations/cal/sync`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ apiKey: calApiKey, userId: pb.authStore.model?.id })
