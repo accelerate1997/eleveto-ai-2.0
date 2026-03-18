@@ -11,13 +11,6 @@ services:
     environment:
       - VITE_PB_URL=${VITE_PB_URL}
       - VITE_API_URL=${VITE_API_URL}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend-router.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.frontend-router.entrypoints=websecure"
-      - "traefik.http.routers.frontend-router.tls=true"
-      - "traefik.http.routers.frontend-router.priority=1"
-      - "traefik.http.services.frontend-service.loadbalancer.server.port=5173"
     restart: always
     deploy:
       resources:
@@ -35,13 +28,6 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - PORT=3001
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend-router.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.backend-router.entrypoints=websecure"
-      - "traefik.http.routers.backend-router.tls=true"
-      - "traefik.http.routers.backend-router.priority=10"
-      - "traefik.http.services.backend-service.loadbalancer.server.port=3001"
     restart: always
     deploy:
       resources:
