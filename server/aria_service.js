@@ -34,6 +34,7 @@ async function ensureAuth() {
         console.log(`[Aria] ✅ Authenticated successfully!`);
     } catch (err) {
         console.error('[Aria] PB Auth Error:', err.message);
+        if (err.data) console.error('   Data:', JSON.stringify(err.data));
     }
 }
 
@@ -129,15 +130,17 @@ async function handleTools(toolCalls, phone) {
                     tool_call_id: toolCall.id,
                     role: "tool",
                     name: "save_lead",
-                    content: `Lead successfully recorded in CRM with ID: ${record.id}. The lead is now in the 'Qualified' column.`
+                    content: "SUCCESS: The lead was registered in the CRM. You can now invite them to the Strategy Meeting."
                 });
             } catch (err) {
                 console.error(`   ❌ Tool Error:`, err.message);
+                if (err.data) console.error('   Data:', JSON.stringify(err.data));
+
                 results.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
                     name: "save_lead",
-                    content: "Error saving lead to CRM: " + err.message
+                    content: "FAIL: Could not save lead to CRM due to a technical error."
                 });
             }
         }
