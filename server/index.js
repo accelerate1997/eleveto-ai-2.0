@@ -428,7 +428,7 @@ app.post('/webhook', async (req, res) => {
         const { event, data } = req.body;
         console.log(`\n🔥 [Aria Webhook] Event: ${event}`);
 
-        if (event !== 'messages.upsert') return res.sendStatus(200);
+        if (event !== 'messages.upsert' && event !== 'MESSAGES_UPSERT') return res.sendStatus(200);
 
         const msg = Array.isArray(data) ? data[0] : data;
 
