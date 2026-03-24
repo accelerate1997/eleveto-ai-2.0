@@ -14,6 +14,28 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Initialize PocketBase (Server-side)
 const pb = new PocketBase(process.env.VITE_PB_URL || 'http://localhost:8090');
 
+/**
+ * Ensure we are authenticated as admin to create/update leads.
+ */
+async function ensureAuth() {
+    try {
+        if (pb.authStore.isValid) return;
+
+        const email = process.env.PB_ADMIN_EMAIL;
+        const password = process.env.PB_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+
+        if (!email || !password) {
+            console.warn('[Aria] PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD missing. Attempting public create.');
+            return;
+        }
+
+        console.log(`[Aria] 🔑 Authenticating to PocketBase as ${email}...`);
+        await pb.admins.authWithPassword(email, password);
+    } catch (err) {
+        console.error('[Aria] PB Auth Error:', err.message);
+    }
+}
+
 // Load Aria's system prompt from the eleveto agent directory
 const PROMPT_PATH = join(__dirname, '../eleveto agent/whatsapp_assistant_prompt.md');
 
@@ -81,7 +103,11 @@ async function handleTools(toolCalls, phone) {
         if (toolCall.function.name === 'save_lead') {
             try {
                 const args = JSON.parse(toolCall.function.arguments);
-                console.log(`[Aria] 📝 Saving qualified lead for ${phone}:`, args);
+                console.log(`\n📝 [Aria Tool] Calling save_lead for ${phone}`);
+                console.log(`   Data:`, JSON.stringify(args, null, 2));
+
+                // 1. Authenticate as admin before database operation
+                await ensureAuth();
 
                 const data = {
                     name: args.name,
@@ -94,21 +120,23 @@ async function handleTools(toolCalls, phone) {
                     status: 'Qualified',
                 };
 
-                await pb.collection('leads').create(data);
+                // 2. Create the record
+                const record = await pb.collection('leads').create(data);
+                console.log(`   ✅ Lead saved! ID: ${record.id}`);
 
                 results.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
                     name: "save_lead",
-                    content: "Lead successfully recorded in CRM as 'Qualified'."
+                    content: `Lead successfully recorded in CRM with ID: ${record.id}. The lead is now in the 'Qualified' column.`
                 });
             } catch (err) {
-                console.error('[Aria] Tool Error:', err.message);
+                console.error(`   ❌ Tool Error:`, err.message);
                 results.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
                     name: "save_lead",
-                    content: "Error saving lead: " + err.message
+                    content: "Error saving lead to CRM: " + err.message
                 });
             }
         }
