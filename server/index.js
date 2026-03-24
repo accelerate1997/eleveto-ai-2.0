@@ -475,7 +475,7 @@ app.post('/webhook', async (req, res) => {
         if (ariaRecentWebhooks.length > 10) ariaRecentWebhooks.pop();
 
         // Process with AI and reply
-        const reply = await processAriaMessage(openai, text, phone);
+        const reply = await processAriaMessage(text, phone);
         await sendWhatsAppMessage(remoteJid, reply, instanceName);
 
     } catch (error) {
