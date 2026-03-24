@@ -252,6 +252,119 @@ app.post('/api/integrations/cal/sync', async (req, res) => {
     }
 });
 
+/**
+ * Evolution API WhatsApp Integration
+ * Logic adapted from "WA Saathi"
+ */
+
+// POST /api/whatsapp/connect
+app.post('/api/whatsapp/connect', async (req, res) => {
+    try {
+        const { instanceName } = req.body;
+        if (!instanceName) {
+            return res.status(400).json({ error: 'Instance Name is required' });
+        }
+
+        const evoUrl = process.env.EVOLUTION_API_URL;
+        const evoKey = process.env.EVOLUTION_API_KEY;
+
+        if (!evoUrl || !evoKey || evoUrl.includes('your-evolution-api-url')) {
+            console.warn("⚠️ Evolution API not configured in .env. Returning Mock Connection.");
+            return res.json({
+                success: true,
+                mock: true,
+                message: "Evolution API not configured. Using Mock mode.",
+                qr: null
+            });
+        }
+
+        console.log(`[WhatsApp] Connecting instance: ${instanceName}`);
+
+        // 1. Try to create the instance
+        const createRes = await fetch(`${evoUrl}/instance/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': evoKey
+            },
+            body: JSON.stringify({
+                instanceName: instanceName,
+                qrcode: true,
+                integration: "WHATSAPP-BAILEYS"
+            })
+        });
+
+        const createData = await createRes.json();
+
+        // 2. If instance exists or was created, get the QR code
+        // Evolution API might return QR immediately on create if qrcode: true
+        if (createData?.qrcode?.base64) {
+            return res.json({
+                success: true,
+                instanceName,
+                qr: createData.qrcode.base64
+            });
+        }
+
+        // Otherwise, fetch connection status/QR
+        const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evoKey }
+        });
+
+        const connectData = await connectRes.json();
+
+        if (connectData?.base64) {
+            return res.json({
+                success: true,
+                instanceName,
+                qr: connectData.base64
+            });
+        } else if (connectData?.instance?.state === 'open' || createData?.instance?.state === 'open') {
+            return res.json({
+                success: true,
+                instanceName,
+                connected: true,
+                message: "Already connected"
+            });
+        }
+
+        res.status(500).json({ error: 'Failed to retrieve WhatsApp QR code', details: connectData });
+
+    } catch (error) {
+        console.error('[WhatsApp Connect] Error:', error);
+        res.status(500).json({ error: 'Internal Server Error during WhatsApp connection' });
+    }
+});
+
+// GET /api/whatsapp/status/:instanceName
+app.get('/api/whatsapp/status/:instanceName', async (req, res) => {
+    const { instanceName } = req.params;
+    const evoUrl = process.env.EVOLUTION_API_URL;
+    const evoKey = process.env.EVOLUTION_API_KEY;
+
+    if (!evoUrl || !evoKey || evoUrl.includes('your-evolution-api-url')) {
+        return res.json({ success: true, state: 'DISCONNECTED', mock: true });
+    }
+
+    try {
+        const response = await fetch(`${evoUrl}/instance/connectionState/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evoKey }
+        });
+
+        const data = await response.json();
+        res.json({
+            success: true,
+            state: data?.instance?.state || 'DISCONNECTED',
+            details: data
+        });
+    } catch (error) {
+        console.error('[WhatsApp Status] Error:', error);
+        res.status(500).json({ error: 'Failed to fetch connection status' });
+    }
+});
+
 app.post('/api/public/landing-ai', async (req, res) => {
     const { problem } = req.body;
 

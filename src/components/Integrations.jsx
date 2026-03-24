@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
-import { Settings, Calendar, Video, Plug, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { Settings, Calendar, Video, Plug, CheckCircle, ExternalLink, RefreshCw, MessageSquare } from 'lucide-react';
 
 export default function Integrations() {
     // Mock state for connection statuses until backend is ready
@@ -17,11 +17,19 @@ export default function Integrations() {
         cal_com: {
             isConnected: false,
             username: null
+        },
+        whatsapp: {
+            isConnected: false,
+            instanceName: null,
+            lastSynced: null
         }
     });
 
     const [calApiKeyInput, setCalApiKeyInput] = useState('');
     const [showCalModal, setShowCalModal] = useState(false);
+    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+    const [whatsappQr, setWhatsappQr] = useState(null);
+    const [whatsappStatus, setWhatsappStatus] = useState('DISCONNECTED');
 
     const [isConnecting, setIsConnecting] = useState(null); // stores which provider is currently connecting
 
@@ -99,6 +107,62 @@ export default function Integrations() {
         } catch (err) {
             console.error("Integrations: Save failed:", err);
             alert('Failed to connect Cal.com: ' + err.message);
+        } finally {
+            setIsConnecting(null);
+        }
+    };
+
+    const handleWhatsAppConnect = async () => {
+        setIsConnecting('whatsapp');
+        setShowWhatsAppModal(true);
+        setWhatsappQr(null);
+
+        try {
+            const userId = pb.authStore.model?.id;
+            const instanceName = `Eleveto_${userId || 'Global'}`;
+
+            const response = await fetch('http://localhost:3001/api/whatsapp/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instanceName })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.qr) {
+                    setWhatsappQr(data.qr);
+                    setWhatsappStatus('AWAITING_SCAN');
+                } else if (data.connected) {
+                    setConnections(prev => ({
+                        ...prev,
+                        whatsapp: {
+                            isConnected: true,
+                            instanceName: data.instanceName,
+                            lastSynced: new Date().toISOString()
+                        }
+                    }));
+                    setWhatsappStatus('CONNECTED');
+                } else if (data.mock) {
+                    alert("Evolution API not configured. Showing mock connection.");
+                    setConnections(prev => ({
+                        ...prev,
+                        whatsapp: {
+                            isConnected: true,
+                            instanceName: 'Mock_Instance',
+                            lastSynced: new Date().toISOString()
+                        }
+                    }));
+                    setShowWhatsAppModal(false);
+                }
+            } else {
+                alert('Failed to connect WhatsApp: ' + (data.error || 'Unknown error'));
+                setShowWhatsAppModal(false);
+            }
+        } catch (err) {
+            console.error("WhatsApp Connection failed:", err);
+            alert('Failed to connect to WhatsApp service.');
+            setShowWhatsAppModal(false);
         } finally {
             setIsConnecting(null);
         }
@@ -194,6 +258,20 @@ export default function Integrations() {
                             color="#111827"
                         />
 
+                        {/* WhatsApp Card */}
+                        <IntegrationCard
+                            title="WhatsApp Business"
+                            description="Connect your WhatsApp via Evolution API to automate client communication and follow-ups."
+                            icon={<MessageSquare size={24} color="#25D366" />}
+                            connected={connections.whatsapp.isConnected}
+                            email={connections.whatsapp.instanceName}
+                            lastSynced={connections.whatsapp.lastSynced}
+                            isConnecting={isConnecting === 'whatsapp'}
+                            onConnect={handleWhatsAppConnect}
+                            onDisconnect={() => handleDisconnect('whatsapp')}
+                            color="#25D366"
+                        />
+
                     </div>
                 </section>
 
@@ -277,6 +355,64 @@ export default function Integrations() {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {showWhatsAppModal && (
+                    <div style={{
+                        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(8px)',
+                        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+                    }}>
+                        <div style={{
+                            background: 'white', borderRadius: '24px', width: '100%', maxWidth: '450px',
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.1)', overflow: 'hidden', padding: '2rem',
+                            textAlign: 'center'
+                        }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Connect WhatsApp</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+                                Scan the QR code below with your WhatsApp mobile app to link your account.
+                            </p>
+
+                            <div style={{ 
+                                background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '16px', 
+                                padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                minHeight: '250px', marginBottom: '1.5rem', position: 'relative'
+                            }}>
+                                {whatsappQr ? (
+                                    <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', maxWidth: '200px' }} />
+                                ) : (
+                                    <div style={{ color: 'var(--text-muted)' }}>
+                                        {isConnecting === 'whatsapp' ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                <RefreshCw size={32} className="animate-spin" style={{ marginBottom: '1rem', animation: 'spin 1.5s linear infinite' }} />
+                                                <span>Generating QR...</span>
+                                            </div>
+                                        ) : (
+                                            "No QR code available."
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: whatsappQr ? '#fbbf24' : '#94a3b8' }}></div>
+                                    {whatsappQr ? "Awaiting scan..." : "Initializing..."}
+                                </div>
+                                <button
+                                    onClick={() => setShowWhatsAppModal(false)}
+                                    style={{
+                                        width: '100%', padding: '0.875rem', borderRadius: '12px',
+                                        border: '1px solid rgba(0,0,0,0.08)', background: 'white',
+                                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--neural-bg)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
