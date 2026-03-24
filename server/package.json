@@ -15,6 +15,7 @@
         "express-rate-limit": "^8.3.1",
         "helmet": "^8.1.0",
         "openai": "^6.27.0",
+        "pocketbase": "^0.21.3",
         "puppeteer": "^22.0.0"
     }
 }

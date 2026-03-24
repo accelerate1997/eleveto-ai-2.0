@@ -6,6 +6,7 @@ import LeadDetailModal from './LeadDetailModal';
 
 const STATUSES = [
     'Lead',
+    'Qualified',
     'Contacted',
     'Meeting Booked',
     'Follow Up',
@@ -15,6 +16,7 @@ const STATUSES = [
 
 const STATUS_COLORS = {
     'Lead': { bg: 'rgba(79, 70, 229, 0.05)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.1)' },
+    'Qualified': { bg: 'rgba(16, 185, 129, 0.08)', color: '#10b981', border: 'rgba(16, 185, 129, 0.2)' },
     'Contacted': { bg: 'rgba(8, 145, 178, 0.05)', color: '#0891b2', border: 'rgba(8, 145, 178, 0.1)' },
     'Meeting Booked': { bg: 'rgba(147, 51, 234, 0.05)', color: '#9333ea', border: 'rgba(147, 51, 234, 0.1)' },
     'Follow Up': { bg: 'rgba(217, 119, 6, 0.05)', color: '#d97706', border: 'rgba(217, 119, 6, 0.1)' },

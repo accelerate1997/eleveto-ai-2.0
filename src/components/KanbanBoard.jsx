@@ -7,6 +7,7 @@ import { UserPlus, Settings, LogOut, ShieldCheck, Activity, Cpu, ChevronRight, S
 
 const COLUMNS = [
     'Lead',
+    'Qualified',
     'Contacted',
     'Meeting Booked',
     'Follow Up',

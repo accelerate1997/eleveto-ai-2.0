@@ -7,8 +7,12 @@ import OpenAI from 'openai';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import PocketBase from 'pocketbase';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Initialize PocketBase (Server-side)
+const pb = new PocketBase(process.env.VITE_PB_URL || 'http://localhost:8090');
 
 // Load Aria's system prompt from the eleveto agent directory
 const PROMPT_PATH = join(__dirname, '../eleveto agent/whatsapp_assistant_prompt.md');
@@ -46,12 +50,74 @@ export function isDuplicate(id) {
     return false;
 }
 
+// Tool definition for lead qualification
+const tools = [
+    {
+        type: "function",
+        function: {
+            name: "save_lead",
+            description: "Save a qualified lead's contact information and business needs to the CRM. Call this only when you have collected enough info (Name, Interest/Problem, and optionally Investment).",
+            parameters: {
+                type: "object",
+                properties: {
+                    name: { type: "string", description: "The lead's full name" },
+                    interest: { type: "string", description: "What they are interested in or the problem they want to solve" },
+                    investment: { type: "string", description: "Their budget or investment capacity (if shared)" },
+                    country: { type: "string", description: "Their location or country" },
+                    notes: { type: "string", description: "Any additional context from the conversation" }
+                },
+                required: ["name", "interest"]
+            }
+        }
+    }
+];
+
+/**
+ * Handle tool calls from OpenAI.
+ */
+async function handleTools(toolCalls, phone) {
+    const results = [];
+    for (const toolCall of toolCalls) {
+        if (toolCall.function.name === 'save_lead') {
+            try {
+                const args = JSON.parse(toolCall.function.arguments);
+                console.log(`[Aria] 📝 Saving qualified lead for ${phone}:`, args);
+
+                const data = {
+                    name: args.name,
+                    whatsapp: phone,
+                    country: args.country || 'Unknown',
+                    investment: args.investment || 'Not shared',
+                    linkedin: '', 
+                    google: '',   
+                    email: '',    
+                    status: 'Qualified',
+                };
+
+                await pb.collection('leads').create(data);
+
+                results.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: "save_lead",
+                    content: "Lead successfully recorded in CRM as 'Qualified'."
+                });
+            } catch (err) {
+                console.error('[Aria] Tool Error:', err.message);
+                results.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: "save_lead",
+                    content: "Error saving lead: " + err.message
+                });
+            }
+        }
+    }
+    return results;
+}
+
 /**
  * Process an incoming message through Aria (OpenAI).
- * @param {OpenAI} openai - The shared OpenAI instance
- * @param {string} userInput - The incoming message text
- * @param {string} phone - The sender's phone number (digits only)
- * @returns {Promise<string>} - Aria's reply
  */
 export async function processAriaMessage(openai, userInput, phone) {
     try {
@@ -60,26 +126,45 @@ export async function processAriaMessage(openai, userInput, phone) {
         }
 
         const history = sessions.get(phone) || [];
-
-        // Rebuild system prompt fresh each call (in case env changed, or date changed)
         const systemPrompt = { role: 'system', content: loadSystemPrompt() };
-
-        const messages = [systemPrompt, ...history, { role: 'user', content: userInput }];
+        let messages = [systemPrompt, ...history, { role: 'user', content: userInput }];
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages,
-            temperature: 0.6,
-            max_tokens: 600
+            tools,
+            tool_choice: "auto",
+            temperature: 0.6
         });
 
-        const replyText = response.choices[0].message.content?.trim()
+        const responseMessage = response.choices[0].message;
+
+        if (responseMessage.tool_calls) {
+            const toolResults = await handleTools(responseMessage.tool_calls, phone);
+            messages.push(responseMessage);
+            messages.push(...toolResults);
+
+            const secondResponse = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages,
+            });
+
+            const finalReply = secondResponse.choices[0].message.content || "Success — I've updated your status.";
+            
+            history.push({ role: 'user', content: userInput });
+            history.push({ role: 'assistant', content: finalReply });
+            if (history.length > 40) history.splice(0, 2);
+            sessions.set(phone, history);
+
+            return finalReply;
+        }
+
+        const replyText = responseMessage.content?.trim()
             || "I'm having a moment — could you say that again?";
 
-        // Persist to session (keep last 20 turns to avoid token overflow)
         history.push({ role: 'user', content: userInput });
         history.push({ role: 'assistant', content: replyText });
-        if (history.length > 40) history.splice(0, 2); // remove oldest turn
+        if (history.length > 40) history.splice(0, 2);
         sessions.set(phone, history);
 
         console.log(`[Aria → ${phone}]: ${replyText.substring(0, 100)}...`);
