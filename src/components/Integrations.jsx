@@ -121,7 +121,7 @@ export default function Integrations() {
             const userId = pb.authStore.model?.id;
             const instanceName = `Eleveto_${userId || 'Global'}`;
 
-            const response = await fetch('http://localhost:3001/api/whatsapp/connect', {
+            const response = await fetch('/api/whatsapp/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ instanceName })
