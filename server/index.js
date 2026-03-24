@@ -5,6 +5,13 @@ import rateLimit from 'express-rate-limit';
 import puppeteer from 'puppeteer';
 import OpenAI from 'openai';
 import * as dotenv from 'dotenv';
+import {
+    processAriaMessage,
+    sendWhatsAppMessage,
+    isDuplicate,
+    clearAriaSession,
+    getAriaSessionCount
+} from './aria_service.js';
 
 dotenv.config({ path: '../.env' }); // Fallback to local .env if present
 // Process environment variables will already be populated by Docker/Compose
@@ -265,10 +272,11 @@ app.post('/api/whatsapp/connect', async (req, res) => {
             return res.status(400).json({ error: 'Instance Name is required' });
         }
 
-        const evoUrl = process.env.EVOLUTION_API_URL;
+        const evoUrlSource = process.env.EVOLUTION_API_URL || '';
+        const evoUrl = evoUrlSource.endsWith('/') ? evoUrlSource.slice(0, -1) : evoUrlSource;
         const evoKey = process.env.EVOLUTION_API_KEY;
 
-        if (!evoUrl || !evoKey || evoUrl.includes('your-evolution-api-url')) {
+        if (!evoUrl || !evoKey || evoUrl.includes('your-evolution-api-url') || evoKey === 'your_evolution_api_key_here') {
             console.warn("⚠️ Evolution API not configured in .env. Returning Mock Connection.");
             return res.json({
                 success: true,
@@ -340,10 +348,11 @@ app.post('/api/whatsapp/connect', async (req, res) => {
 // GET /api/whatsapp/status/:instanceName
 app.get('/api/whatsapp/status/:instanceName', async (req, res) => {
     const { instanceName } = req.params;
-    const evoUrl = process.env.EVOLUTION_API_URL;
+    const evoUrlSource = process.env.EVOLUTION_API_URL || '';
+    const evoUrl = evoUrlSource.endsWith('/') ? evoUrlSource.slice(0, -1) : evoUrlSource;
     const evoKey = process.env.EVOLUTION_API_KEY;
 
-    if (!evoUrl || !evoKey || evoUrl.includes('your-evolution-api-url')) {
+    if (!evoUrl || !evoKey || evoUrl.includes('your-evolution-api-url') || evoKey === 'your_evolution_api_key_here') {
         return res.json({ success: true, state: 'DISCONNECTED', mock: true });
     }
 
@@ -406,7 +415,96 @@ FORMATTING RULES:
     }
 });
 
+/**
+ * ─────────────────────────────────────────────────
+ *  ARIA — WhatsApp AI Agent Webhook
+ *  POST /webhook  (called by Evolution API)
+ * ─────────────────────────────────────────────────
+ */
+const ariaRecentWebhooks = [];
+
+app.post('/webhook', async (req, res) => {
+    try {
+        const { event, data } = req.body;
+        console.log(`\n🔥 [Aria Webhook] Event: ${event}`);
+
+        if (event !== 'messages.upsert') return res.sendStatus(200);
+
+        const msg = Array.isArray(data) ? data[0] : data;
+
+        // Anti-loop: ignore messages older than 60s but within the last hour
+        const rawTs = msg?.messageTimestamp;
+        if (rawTs) {
+            const age = Math.floor(Date.now() / 1000) - rawTs;
+            if (age > 60 && age < 3600) {
+                console.log(`[Aria] Skipping old message (${age}s).`);
+                return res.sendStatus(200);
+            }
+        }
+
+        // Acknowledge early to prevent Evolution API retries
+        res.sendStatus(200);
+
+        const key = msg?.key;
+        const msgId = key?.id;
+        const remoteJid = key?.remoteJid;
+        const fromMe = key?.fromMe;
+        const message = msg?.message;
+
+        // Skip our own messages, groups, and duplicates
+        if (!message || !remoteJid || fromMe) return;
+        if (remoteJid.includes('@g.us')) return;
+        if (msgId && isDuplicate(msgId)) {
+            console.log(`[Aria] Duplicate msg ${msgId}, skipping.`);
+            return;
+        }
+
+        const text = message.conversation ||
+            message.extendedTextMessage?.text ||
+            message.imageMessage?.caption;
+
+        if (!text) return;
+
+        const phone = remoteJid.split('@')[0];
+        const instanceName = req.body.instance || process.env.INSTANCE_NAME || 'Eleveto_Global';
+
+        console.log(`\n📨 [Aria] From ${phone}: ${text}`);
+
+        // Log to debug cache
+        ariaRecentWebhooks.unshift({ time: new Date().toISOString(), phone, preview: text.substring(0, 60) });
+        if (ariaRecentWebhooks.length > 10) ariaRecentWebhooks.pop();
+
+        // Process with AI and reply
+        const reply = await processAriaMessage(openai, text, phone);
+        await sendWhatsAppMessage(remoteJid, reply, instanceName);
+
+    } catch (error) {
+        console.error('[Aria Webhook Error]:', error);
+        if (!res.headersSent) res.sendStatus(500);
+    }
+});
+
+// Clear a session (for testing): POST /api/aria/session/clear { "phone": "..." }
+app.post('/api/aria/session/clear', (req, res) => {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone required' });
+    clearAriaSession(phone);
+    res.json({ success: true });
+});
+
+// Aria status: GET /api/aria/status
+app.get('/api/aria/status', (req, res) => {
+    res.json({
+        status: 'ARIA_ALIVE',
+        activeSessions: getAriaSessionCount(),
+        instance: process.env.INSTANCE_NAME || 'Eleveto_Global',
+        recentWebhooks: ariaRecentWebhooks
+    });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 Eleveto Scraper Server → http://0.0.0.0:${PORT}`);
-    console.log(`   Health check: http://0.0.0.0:${PORT}/api/health\n`);
+    console.log(`\n🚀 Eleveto Server → http://0.0.0.0:${PORT}`);
+    console.log(`   Health check: http://0.0.0.0:${PORT}/api/health`);
+    console.log(`   Aria webhook: POST http://0.0.0.0:${PORT}/webhook`);
+    console.log(`   Aria status:  GET  http://0.0.0.0:${PORT}/api/aria/status\n`);
 });

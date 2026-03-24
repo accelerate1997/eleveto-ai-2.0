@@ -18,13 +18,17 @@ services:
 
   backend:
     build:
-      context: ./server
-      dockerfile: Dockerfile.backend
+      context: .
+      dockerfile: server/Dockerfile.backend
     ports:
       - "3001:3001"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - INSTANCE_NAME=${INSTANCE_NAME}
+      - CALCOM_LINK=${CALCOM_LINK}
       - PORT=3001
     restart: always
     deploy:

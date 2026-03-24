@@ -1,0 +1,98 @@
+## 📋 Table of Contents
+- [Features](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#features)
+- [Prerequisites](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#prerequisites)
+- [Installation](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#installation)
+- [CLI Usage](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#cli-usage)
+- [Library Usage (Node.js)](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#library-usage-nodejs)
+- [Examples](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#examples)
+- [Troubleshooting](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#troubleshooting)
+- [Development](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#development)
+- [Contributing](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#contributing)
+- [License](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#license)
+[Features](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#features)
+[Prerequisites](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#prerequisites)
+[Installation](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#installation)
+[CLI Usage](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#cli-usage)
+[Library Usage (Node.js)](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#library-usage-nodejs)
+[Examples](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#examples)
+[Troubleshooting](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#troubleshooting)
+[Development](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#development)
+[Contributing](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#contributing)
+[License](https://github.com/Code-Media-Labs/google-maps-scraper?tab=readme-ov-file#license)
+
+## Features
+- 
+🔍 Scrapes Google Maps business listings for any search query
+
+- 
+📊 Extracts detailed business data:
+
+Name
+Star rating
+Total reviews
+Phone number
+Google Maps URL
+
+
+- Name
+- Star rating
+- Total reviews
+- Phone number
+- Google Maps URL
+- 
+🔁 Automatically scrolls until no new results are found
+
+- 
+🛡️ Deduplicates entries by Maps URL
+
+- 
+📦 Multiple output formats:
+
+results.json
+results.xlsx (ExcelJS)
+
+
+- results.json
+- results.xlsx (ExcelJS)
+- 
+🧰 Flexible usage:
+
+CLI tool
+Importable NPM library
+
+
+- CLI tool
+- Importable NPM library
+- 
+⚡ Configurable scroll limits and headless mode
+
+- 
+🎯 Great for lead generation, market research, competitor analysis
+
+🔍 Scrapes Google Maps business listings for any search query
+📊 Extracts detailed business data:
+- Name
+- Star rating
+- Total reviews
+- Phone number
+- Google Maps URL
+🔁 Automatically scrolls until no new results are found
+🛡️ Deduplicates entries by Maps URL
+📦 Multiple output formats:
+- results.json
+- results.xlsx (ExcelJS)
+
+```
+results.json
+```
+
+
+```
+results.xlsx
+```
+
+🧰 Flexible usage:
+- CLI tool
+- Importable NPM library
+⚡ Configurable scroll limits and headless mode
+🎯 Great for lead generation, market research, competitor analysis

@@ -3,7 +3,7 @@ import {
     Terminal, Bot, Zap, Boxes, ArrowRight, ExternalLink, Shield, CheckCircle2, 
     Star, Menu, X, Play, ChevronRight, MessageSquare, Activity, 
     Linkedin, Twitter, Github, Image as ImageIcon, Send, Clock, Sparkles,
-    RefreshCw, Cpu, Layers, Lock, Database, Globe, Plus, Minus, Calendar, Layout
+    RefreshCw, Cpu, Layers, Lock, Database, Globe, Plus, Minus
 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 
@@ -819,23 +819,22 @@ const LandingPage = ({ onLoginClick }) => {
                 <div role="dialog" style={{
                     position: 'fixed', inset: 0, zIndex: 9999,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 'clamp(0.5rem, 2vw, 2rem)', animation: 'fadeIn 0.3s ease'
+                    padding: '2rem', animation: 'fadeIn 0.3s ease'
                 }}>
                     <div 
                         onClick={closeProjectDetails}
                         style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)' }} 
                     />
                     <div className="glass-card" style={{
-                        position: 'relative', width: '100%', maxWidth: '1100px', maxHeight: '90vh',
-                        overflowY: 'auto', borderRadius: '32px', padding: 0, border: 'none',
-                        boxShadow: '0 50px 100px -20px rgba(0, 0, 0, 0.3)', animation: 'slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                        display: 'flex', flexDirection: 'column', background: 'white'
+                        position: 'relative', width: '100%', maxWidth: '1000px', maxHeight: '90vh',
+                        overflowY: 'auto', borderRadius: '32px', padding: 0, border: '1px solid rgba(255, 255, 255, 0.2)',
+                        boxShadow: '0 50px 100px -20px rgba(0, 0, 0, 0.25)', animation: 'slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}>
                         <button 
                             onClick={closeProjectDetails}
                             style={{ 
-                                position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 20,
-                                background: 'white', border: 'none', width: '40px', height: '40px',
+                                position: 'absolute', top: '24px', right: '24px', zIndex: 10,
+                                background: 'white', border: 'none', width: '44px', height: '44px',
                                 borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', color: '#64748b'
                             }}
@@ -843,24 +842,9 @@ const LandingPage = ({ onLoginClick }) => {
                             <X size={20} />
                         </button>
 
-                        <div className="project-details-grid" style={{ 
-                            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-                            flex: 1
-                        }}>
-                            <style>{`
-                                @media (max-width: 800px) {
-                                    .project-details-grid { grid-template-columns: 1fr !important; }
-                                    .project-info-pane { padding: 2rem !important; }
-                                    .project-gallery-pane { height: 350px !important; min-height: 350px !important; }
-                                }
-                            `}</style>
-                            
-                            {/* Left: Gallery */}
-                            <div className="project-gallery-pane" style={{ 
-                                background: '#020617', position: 'relative', 
-                                minHeight: '500px', display: 'flex', flexDirection: 'column',
-                                borderRight: '1px solid #f1f5f9'
-                            }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))' }}>
+                            <div style={{ background: '#f1f5f9', position: 'relative', minHeight: '450px', display: 'flex', flexDirection: 'column' }}>
+                                {/* Main Image Display */}
                                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                                     {(() => {
                                         const gallery = [
@@ -873,17 +857,17 @@ const LandingPage = ({ onLoginClick }) => {
                                             <img 
                                                 src={`${pb.baseUrl}/api/files/${selectedProject.collectionId}/${selectedProject.id}/${currentImage}`} 
                                                 alt={selectedProject.project_name} 
-                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
                                             />
                                         ) : (
-                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1e293b' }}>
-                                                <ImageIcon size={64} style={{ opacity: 0.2 }} />
+                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                                                <ImageIcon size={64} />
                                             </div>
                                         );
                                     })()}
                                 </div>
 
-                                {/* Thumbnail Navigation Strip */}
+                                {/* Thumbnail Strip */}
                                 {(() => {
                                     const gallery = [
                                         ...(selectedProject.Project_thumnail ? [selectedProject.Project_thumnail] : []),
@@ -892,26 +876,32 @@ const LandingPage = ({ onLoginClick }) => {
                                     
                                     return gallery.length > 1 ? (
                                         <div style={{ 
-                                            padding: '1rem', display: 'flex', gap: '8px', overflowX: 'auto', 
-                                            background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(10px)',
-                                            scrollbarWidth: 'none'
+                                            padding: '1rem', 
+                                            display: 'flex', 
+                                            gap: '10px', 
+                                            overflowX: 'auto', 
+                                            background: 'rgba(255,255,255,0.8)',
+                                            borderTop: '1px solid #e2e8f0'
                                         }}>
                                             {gallery.map((img, idx) => (
                                                 <div 
                                                     key={idx} 
                                                     onClick={() => setActiveImageIndex(idx)}
                                                     style={{ 
-                                                        width: '56px', height: '56px', borderRadius: '12px', 
-                                                        overflow: 'hidden', flexShrink: 0, cursor: 'pointer',
-                                                        border: '2px solid',
-                                                        borderColor: activeImageIndex === idx ? '#3b82f6' : 'transparent',
+                                                        width: '60px', 
+                                                        height: '60px', 
+                                                        borderRadius: '8px', 
+                                                        overflow: 'hidden', 
+                                                        flexShrink: 0,
+                                                        cursor: 'pointer',
+                                                        border: activeImageIndex === idx ? '2px solid #4f46e5' : '2px solid transparent',
                                                         opacity: activeImageIndex === idx ? 1 : 0.6,
-                                                        transition: 'all 0.2s', background: '#0f172a'
+                                                        transition: 'all 0.2s'
                                                     }}
                                                 >
                                                     <img 
                                                         src={`${pb.baseUrl}/api/files/${selectedProject.collectionId}/${selectedProject.id}/${img}`} 
-                                                        alt="Gallery" 
+                                                        alt="Thumbnail" 
                                                         style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                                                     />
                                                 </div>
@@ -920,45 +910,30 @@ const LandingPage = ({ onLoginClick }) => {
                                     ) : null;
                                 })()}
                             </div>
-
-                            {/* Right: Info */}
-                            <div className="project-info-pane" style={{ padding: '3.5rem', background: 'white', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ padding: '3.5rem' }}>
                                 <div style={{ 
-                                    display: 'inline-flex', padding: '6px 14px', borderRadius: '100px', 
-                                    background: '#eff6ff', color: '#3b82f6',
-                                    fontSize: '0.75rem', fontWeight: 800, marginBottom: '2rem',
-                                    letterSpacing: '0.05em', width: 'fit-content'
-                                }}>INTERNAL CASE STUDY</div>
-                                
-                                <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '1.5rem', color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
-                                    {selectedProject.project_name}
-                                </h2>
-                                
-                                <div style={{ display: 'flex', gap: '2.5rem', marginBottom: '3rem', padding: '1.5rem 0', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9' }}>
+                                    display: 'inline-flex', padding: '6px 12px', borderRadius: '8px', 
+                                    background: 'rgba(79, 70, 229, 0.05)', color: '#4f46e5',
+                                    fontSize: '0.75rem', fontWeight: 800, marginBottom: '1.5rem', letterSpacing: '0.05em'
+                                }}>CASE STUDY</div>
+                                <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '1.5rem', color: '#0f172a', lineHeight: 1.1 }}>{selectedProject.project_name}</h2>
+                                <div style={{ display: 'flex', gap: '2rem', marginBottom: '2.5rem' }}>
                                     <div>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.1em' }}>Project Date</div>
-                                        <div style={{ color: '#0f172a', fontWeight: 700, fontSize: '0.95rem' }}>
-                                            <Calendar size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-                                            {new Date(selectedProject.created).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                                        </div>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Date</div>
+                                        <div style={{ color: '#475569', fontWeight: 600 }}>{new Date(selectedProject.created).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.1em' }}>Deployment</div>
-                                        <div style={{ color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem' }}>
-                                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} /> PROD-LIVE
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Status</div>
+                                        <div style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> Live System
                                         </div>
                                     </div>
                                 </div>
-
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.1em' }}>Project Brief</div>
-                                    <p style={{ color: '#475569', fontSize: '1.1rem', lineHeight: 1.8, whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>
-                                        {selectedProject.Desicription_}
-                                    </p>
-                                </div>
-
-                                <button onClick={onLoginClick} className="btn-primary-v2" style={{ width: '100%', justifyContent: 'center', height: '60px', marginTop: 'auto' }}>
-                                    Deploy Similar Automation <ArrowRight size={20} />
+                                <p style={{ color: '#475569', fontSize: '1.1rem', lineHeight: 1.8, marginBottom: '2.5rem', whiteSpace: 'pre-wrap' }}>
+                                    {selectedProject.Desicription_}
+                                </p>
+                                <button onClick={onLoginClick} className="btn-primary-v2" style={{ width: 'auto' }}>
+                                    Deploy Similar System <ArrowRight size={18} />
                                 </button>
                             </div>
                         </div>

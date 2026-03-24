@@ -3,7 +3,8 @@ import { pb } from '../lib/pocketbase';
 import { 
     Briefcase, Plus, Search, RefreshCw, AlertCircle, 
     X, Upload, Image as ImageIcon, Trash2, ExternalLink,
-    ChevronRight, Loader2, Edit3
+    ChevronRight, Loader2, Edit3, CheckCircle, Calendar,
+    FileText, Layout
 } from 'lucide-react';
 
 export default function PortfolioManagement() {
@@ -126,7 +127,6 @@ export default function PortfolioManagement() {
             data.append('project_name', formData.project_name);
             data.append('Desicription_', formData.Desicription_);
             
-            // For multiple files in PocketBase, append each file to the same key
             selectedImages.forEach(file => {
                 data.append('project_images_', file);
             });
@@ -168,93 +168,96 @@ export default function PortfolioManagement() {
     );
 
     return (
-        <div className="dashboard-view">
+        <div className="dashboard-view" style={{ padding: 'var(--container-px)' }}>
             {/* Header */}
-            <header className="dashboard-header">
+            <header className="dashboard-header" style={{ marginBottom: '3rem' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>
-                        Portfolio Management
-                    </h1>
-                    <p className="subtitle" style={{ textAlign: 'left', margin: 0, color: 'var(--text-muted)', fontWeight: 500 }}>
-                        Manage agency projects and case studies
+                    <h1 style={{ marginBottom: '0.5rem' }}>Portfolio</h1>
+                    <p style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                        Showcase your best work and manage project case studies
                     </p>
                 </div>
-                <div className="header-actions">
-                    {/* Search */}
-                    <div style={{ position: 'relative' }}>
-                        <Search size={15} style={{
-                            position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
+                <div className="header-actions" style={{ gap: '1rem' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                        <Search size={18} style={{
+                            position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
                             color: 'var(--text-muted)', pointerEvents: 'none',
                         }} />
                         <input
                             type="text"
-                            placeholder="Search projects…"
+                            placeholder="Search projects..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
+                            className="glass"
                             style={{
-                                height: '44px', paddingLeft: '40px', paddingRight: '1rem',
-                                border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '12px',
-                                fontSize: '0.875rem', width: '240px', fontFamily: 'Inter, sans-serif',
-                                background: 'white', outline: 'none', color: 'var(--text-primary)',
-                                fontWeight: 500, transition: 'all 0.2s',
+                                height: '52px', paddingLeft: '48px',
+                                borderRadius: '16px', fontSize: '0.95rem',
+                                border: '1px solid var(--glass-border)',
                             }}
                         />
                     </div>
 
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        style={{
-                            background: 'var(--primary-indigo)', color: 'white',
-                            padding: '0 1.5rem', height: '44px',
-                            borderRadius: '12px', fontWeight: 700, border: 'none',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                            fontFamily: 'Inter, sans-serif', fontSize: '0.875rem',
-                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
-                            transition: 'all 0.2s'
-                        }}
+                        className="btn"
+                        style={{ height: '52px', padding: '0 2rem', width: 'auto' }}
                     >
-                        <Plus size={18} />
-                        Add Project
+                        <Plus size={20} />
+                        <span>Add Project</span>
                     </button>
                     
                     <button
                         onClick={fetchPortfolios}
                         disabled={loading}
-                        className="btn-secondary btn-square"
-                        style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        className="btn glass"
+                        style={{ width: '52px', height: '52px', padding: 0, background: 'white', color: 'var(--text-primary)' }}
                     >
-                        <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
                 </div>
             </header>
 
             {error && (
                 <div style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    background: '#fef2f2', border: '1px solid rgba(239,68,68,0.2)',
-                    borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.5rem',
-                    color: '#ef4444', fontSize: '0.875rem', fontWeight: 500,
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    background: '#fef2f2', border: '1px solid #fee2e2',
+                    borderRadius: '16px', padding: '1.25rem', marginBottom: '2rem',
+                    color: '#ef4444', fontSize: '0.95rem', fontWeight: 500,
                 }}>
-                    <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                    <AlertCircle size={20} />
                     {error}
                 </div>
             )}
 
             {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '100px' }}>
-                    <Loader2 size={40} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary-indigo)' }} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="glass-card" style={{ flex: '1 1 350px', height: '400px', opacity: 0.5, background: '#f8fafc' }}>
+                            <div className="animate-pulse" style={{ height: '200px', background: '#e2e8f0', borderRadius: '12px', marginBottom: '1.5rem' }} />
+                            <div className="animate-pulse" style={{ height: '24px', background: '#e2e8f0', borderRadius: '4px', width: '60%', marginBottom: '1rem' }} />
+                            <div className="animate-pulse" style={{ height: '16px', background: '#e2e8f0', borderRadius: '4px', width: '90%' }} />
+                        </div>
+                    ))}
                 </div>
             ) : filtered.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '80px', background: 'white', borderRadius: '24px', border: '1px dashed #e2e8f0' }}>
-                    <Briefcase size={48} style={{ color: '#cbd5e1', marginBottom: '1rem' }} />
-                    <h3 style={{ fontWeight: 700, color: '#0f172a' }}>No projects found</h3>
-                    <p style={{ color: '#64748b' }}>Start by adding your first portfolio item</p>
+                <div className="glass-card" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+                    <div style={{ 
+                        width: '80px', height: '80px', borderRadius: '24px', 
+                        background: 'var(--neural-bg)', display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem'
+                    }}>
+                        <Briefcase size={40} style={{ color: 'var(--text-muted)' }} />
+                    </div>
+                    <h3>No projects found</h3>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                        {search ? "Try a different search term" : "Begin by creating your first portfolio showcase"}
+                    </p>
                 </div>
             ) : (
                 <div className="cards-grid" style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                    gap: '1.5rem'
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                    gap: '2rem'
                 }}>
                     {filtered.map(project => (
                         <ProjectCard 
@@ -267,67 +270,110 @@ export default function PortfolioManagement() {
                 </div>
             )}
 
-            {/* Add Project Modal */}
+            {/* Redesigned Project Modal */}
             {isModalOpen && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 2000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '2rem', background: 'rgba(2, 6, 23, 0.4)', backdropFilter: 'blur(8px)'
-                }}>
-                    <div style={{
-                        background: 'white', width: '95vw', maxWidth: '1200px', height: '90vh',
-                        borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-                        position: 'relative', padding: '2.5rem', display: 'flex', flexDirection: 'column'
+                <div className="modal-overlay" style={{ zIndex: 10000 }}>
+                    <div className="modal-content glass-card" style={{
+                        maxWidth: '900px', width: '100%', padding: 0,
+                        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                        maxHeight: 'calc(100vh - 40px)', border: 'none'
                     }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                            <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800 }}>
-                                {editingProject ? 'Edit Project' : 'Add New Project'}
-                            </h2>
-                            <button onClick={resetForm} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                        {/* Modal Header */}
+                        <div style={{ 
+                            padding: '1.5rem 2rem', background: 'white', 
+                            borderBottom: '1px solid var(--glass-border)',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ 
+                                    width: '40px', height: '40px', borderRadius: '12px', 
+                                    background: 'var(--primary-indigo)', color: 'white',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    {editingProject ? <Edit3 size={20} /> : <Plus size={20} />}
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{editingProject ? 'Edit Project' : 'New Project'}</h3>
+                            </div>
+                            <button onClick={resetForm} className="modal-close" style={{ position: 'relative', top: 0, right: 0 }}>
                                 <X size={20} />
                             </button>
-                        </header>
+                        </div>
 
-                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
-                            <div className="form-grid">
+                        {/* Modal Body */}
+                        <form onSubmit={handleSubmit} style={{ 
+                            flex: 1, overflowY: 'auto', padding: '2rem',
+                            display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: '2rem'
+                        }} className="project-form-grid">
+                            <style>{`
+                                @media (max-width: 850px) {
+                                    .project-form-grid { grid-template-columns: 1fr !important; }
+                                    .project-sidebar { order: -1; }
+                                }
+                                .dropzone:hover { border-color: var(--primary-indigo) !important; background: rgba(59, 130, 246, 0.02) !important; }
+                            `}</style>
+                            
+                            <div className="project-main" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                 <div className="form-group">
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Project Name</label>
+                                    <label>Project Title</label>
                                     <input
                                         type="text"
                                         required
                                         value={formData.project_name}
                                         onChange={e => setFormData({...formData, project_name: e.target.value})}
-                                        placeholder="Agency Dashboard Redesign"
-                                        style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem' }}
+                                        placeholder="Enter project name..."
+                                        className="glass"
                                     />
                                 </div>
 
+                                <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <label>Case Study Description</label>
+                                    <textarea
+                                        required
+                                        value={formData.Desicription_}
+                                        onChange={e => setFormData({...formData, Desicription_: e.target.value})}
+                                        placeholder="Detail the challenges, solution, and impact..."
+                                        className="glass"
+                                        style={{ 
+                                            flex: 1, minHeight: '300px', height: 'auto',
+                                            padding: '1.25rem', lineHeight: 1.6, resize: 'none'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="project-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                {/* Thumbnail Section */}
                                 <div className="form-group">
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Main Thumbnail</label>
+                                    <label>Thumbnail Cover</label>
                                     <div 
-                                        onClick={() => document.getElementById('Project_thumnail').click()}
+                                        onClick={() => document.getElementById('Project_thumnail_modal').click()}
+                                        className="dropzone"
                                         style={{
-                                            border: '2px dashed #e2e8f0', borderRadius: '12px', padding: '0.75rem',
-                                            textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s',
-                                            background: thumbnailPreview ? 'none' : '#f8fafc',
-                                            position: 'relative', overflow: 'hidden', height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                            border: '2px dashed var(--glass-border)', borderRadius: '16px',
+                                            height: '180px', cursor: 'pointer', transition: 'all 0.2s',
+                                            background: '#f8fafc', overflow: 'hidden', position: 'relative',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center'
                                         }}
                                     >
                                         {thumbnailPreview ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden' }}>
-                                                    <img src={thumbnailPreview} alt="Thumbnail Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <div style={{ width: '100%', height: '100%' }}>
+                                                <img src={thumbnailPreview} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <div style={{ 
+                                                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0,
+                                                    transition: 'opacity 0.2s'
+                                                }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                                                    <RefreshCw size={24} style={{ color: 'white' }} />
                                                 </div>
-                                                <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: 600 }}>Thumbnail Set</span>
                                             </div>
                                         ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <ImageIcon size={18} style={{ color: '#94a3b8' }} />
-                                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Set Primary Thumbnail</span>
+                                            <div style={{ textAlign: 'center', padding: '1rem' }}>
+                                                <ImageIcon size={32} style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }} />
+                                                <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Set Cover</div>
                                             </div>
                                         )}
                                         <input
-                                            id="Project_thumnail"
+                                            id="Project_thumnail_modal"
                                             type="file"
                                             accept="image/*"
                                             onChange={handleThumbnailChange}
@@ -336,115 +382,92 @@ export default function PortfolioManagement() {
                                     </div>
                                 </div>
 
+                                {/* Gallery Section */}
                                 <div className="form-group">
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gallery Images</label>
-                                    <div 
-                                        onClick={() => document.getElementById('project_images_').click()}
-                                        style={{
-                                            border: '2px dashed #e2e8f0', borderRadius: '12px', padding: '1rem',
-                                            textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s',
-                                            background: '#f8fafc',
-                                            marginBottom: '1rem'
+                                    <label>Gallery Images</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => document.getElementById('project_images_modal').click()}
+                                        className="btn glass"
+                                        style={{ 
+                                            background: 'white', color: 'var(--primary-indigo)', 
+                                            border: '1px solid var(--primary-indigo)',
+                                            height: '44px', fontSize: '0.85rem'
                                         }}
                                     >
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                                            <Upload size={18} style={{ color: '#94a3b8' }} />
-                                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Upload Project Screenshots (Multi-select enabled)</span>
-                                        </div>
-                                        <input
-                                            id="project_images_"
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={handleImageChange}
-                                            style={{ display: 'none' }}
-                                        />
+                                        <Upload size={16} /> Add Images
+                                    </button>
+                                    <input
+                                        id="project_images_modal"
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleImageChange}
+                                        style={{ display: 'none' }}
+                                    />
+                                    
+                                    <div style={{ 
+                                        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', 
+                                        gap: '8px', marginTop: '1rem', maxHeight: '200px', overflowY: 'auto'
+                                    }}>
+                                        {imagePreviews.map((preview, index) => (
+                                            <div key={index} style={{ position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+                                                <img src={preview} alt="Gallery" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => removeImage(index)}
+                                                    style={{ 
+                                                        position: 'absolute', top: '2px', right: '2px', 
+                                                        background: 'rgba(239, 68, 68, 0.9)', color: 'white', 
+                                                        border: 'none', borderRadius: '4px', cursor: 'pointer',
+                                                        width: '20px', height: '20px', padding: 0, display: 'flex',
+                                                        alignItems: 'center', justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
-
-                                    {imagePreviews.length > 0 && (
-                                        <div style={{ 
-                                            display: 'grid', 
-                                            gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', 
-                                            gap: '10px',
-                                            maxHeight: '200px',
-                                            overflowY: 'auto',
-                                            padding: '10px',
-                                            background: '#f1f5f9',
-                                            borderRadius: '12px'
-                                        }}>
-                                            {imagePreviews.map((preview, index) => (
-                                                <div key={index} style={{ position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                                                    <img src={preview} alt={`Preview ${index}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                    <button 
-                                                        type="button"
-                                                        onClick={(e) => { e.stopPropagation(); removeImage(index); }}
-                                                        style={{ 
-                                                            position: 'absolute', top: '2px', right: '2px', 
-                                                            background: 'rgba(239, 68, 68, 0.9)', color: 'white', 
-                                                            border: 'none', borderRadius: '4px', cursor: 'pointer',
-                                                            padding: '2px'
-                                                        }}
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
-
-                            <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Detailed Description</label>
-                                <textarea
-                                    required
-                                    value={formData.Desicription_}
-                                    onChange={e => setFormData({...formData, Desicription_: e.target.value})}
-                                    placeholder="Write a comprehensive description of the project challenges, solutions, and outcomes..."
-                                    style={{ 
-                                        width: '100%', flex: 1, padding: '1.25rem', borderRadius: '16px', 
-                                        border: '1px solid #e2e8f0', resize: 'none', fontSize: '1.1rem', lineHeight: 1.6,
-                                        minHeight: '250px'
-                                    }}
-                                />
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                                <button 
-                                    type="button"
-                                    onClick={resetForm}
-                                    style={{
-                                        padding: '0.75rem 2rem', borderRadius: '12px', border: '1px solid #e2e8f0',
-                                        background: 'white', color: '#64748b', fontWeight: 600, cursor: 'pointer'
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="submit" 
-                                    disabled={isSubmitting}
-                                    style={{
-                                        background: 'var(--primary-indigo)', color: 'white',
-                                        padding: '0.75rem 3rem', borderRadius: '12px', border: 'none', fontWeight: 700,
-                                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                        boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)'
-                                    }}
-                                >
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : (editingProject ? <RefreshCw size={18} /> : <CheckCircle size={18} />)}
-                                    {isSubmitting ? 'Saving...' : (editingProject ? 'Update Project' : 'Publish Project')}
-                                </button>
-                            </div>
                         </form>
+
+                        {/* Modal Footer */}
+                        <div style={{ 
+                            padding: '1.50rem 2rem', background: '#f8fafc',
+                            borderTop: '1px solid var(--glass-border)',
+                            display: 'flex', justifyContent: 'flex-end', gap: '1rem'
+                        }}>
+                            <button 
+                                type="button"
+                                onClick={resetForm}
+                                className="btn glass"
+                                style={{ width: 'auto', padding: '0 2rem', background: 'transparent' }}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={handleSubmit}
+                                disabled={isSubmitting}
+                                className="btn"
+                                style={{ width: 'auto', padding: '0 3rem' }}
+                            >
+                                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
+                                {isSubmitting ? 'Saving...' : (editingProject ? 'Update Project' : 'Publish Project')}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
             <style>{`
-                .animate-spin { animation: spin 1s linear infinite; }
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                .btn-secondary { background: white; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; display: flex; alignItems: center; justifyContent: center; }
-                .btn-secondary:hover { background: #f8fafc; }
+                .animate-spin { animation: spin 0.8s linear infinite; }
+                .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: .5; }
+                }
             `}</style>
         </div>
     );
@@ -453,73 +476,74 @@ export default function PortfolioManagement() {
 function ProjectCard({ project, onDelete, onEdit }) {
     const imageUrl = project.Project_thumnail 
         ? `${pb.baseUrl}/api/files/${project.collectionId}/${project.id}/${project.Project_thumnail}`
-        : (project.project_images_ ? `${pb.baseUrl}/api/files/${project.collectionId}/${project.id}/${project.project_images_}` : null);
+        : (project.project_images_ && project.project_images_.length > 0 
+           ? `${pb.baseUrl}/api/files/${project.collectionId}/${project.id}/${Array.isArray(project.project_images_) ? project.project_images_[0] : project.project_images_}` 
+           : null);
 
     return (
-        <div style={{
-            background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)',
-            overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-            display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease'
-        }} className="portfolio-card">
-            <div style={{ height: '200px', background: '#f1f5f9', position: 'relative', overflow: 'hidden' }}>
+        <div className="glass-card" style={{
+            padding: 0, display: 'flex', flexDirection: 'column', 
+            overflow: 'hidden', border: '1px solid var(--glass-border)'
+        }}>
+            <div style={{ height: '200px', position: 'relative', background: 'var(--neural-bg)' }}>
                 {imageUrl ? (
                     <img src={imageUrl} alt={project.project_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ImageIcon size={40} style={{ color: '#cbd5e1' }} />
+                        <Layout size={48} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                     </div>
                 )}
-                <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
-                    <button 
-                        onClick={onEdit}
-                        style={{
-                            width: '32px', height: '32px', borderRadius: '8px', 
-                            background: 'white', border: 'none', color: 'var(--primary-indigo)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                            padding: 0
-                        }}
-                    >
-                        <Edit3 size={14} />
+                <div style={{ 
+                    position: 'absolute', top: '12px', right: '12px', 
+                    display: 'flex', gap: '8px', opacity: 0, transform: 'translateY(-10px)',
+                    transition: 'all 0.3s'
+                }} className="card-controls">
+                    <button onClick={onEdit} className="btn glass" style={{ width: '36px', height: '36px', padding: 0, background: 'white' }}>
+                        <Edit3 size={16} />
                     </button>
-                    <button 
-                        onClick={onDelete}
-                        style={{
-                            width: '32px', height: '32px', borderRadius: '8px', 
-                            background: 'white', border: 'none', color: '#ef4444',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                    >
-                        <Trash2 size={14} />
+                    <button onClick={onDelete} className="btn glass" style={{ width: '36px', height: '36px', padding: 0, background: 'white', color: '#ef4444' }}>
+                        <Trash2 size={16} />
                     </button>
                 </div>
+                <style>{`
+                    .glass-card:hover .card-controls { opacity: 1; transform: translateY(0); }
+                `}</style>
             </div>
+
             <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', fontFamily: 'Outfit, sans-serif' }}>
-                    {project.project_name}
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1.5rem', flex: 1 }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
+                    <div style={{ 
+                        padding: '4px 10px', borderRadius: '100px', background: 'rgba(59, 130, 246, 0.1)',
+                        color: 'var(--primary-indigo)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase'
+                    }}>
+                        Case Study
+                    </div>
+                </div>
+                <h3 style={{ fontSize: '1.25rem', marginBottom: '0.75rem' }}>{project.project_name}</h3>
+                <p style={{ 
+                    color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, 
+                    marginBottom: '1.5rem', flex: 1,
+                    display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                }}>
                     {project.Desicription_}
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
+                <div style={{ 
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    paddingTop: '1rem', borderTop: '1px solid var(--neural-bg)'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        <Calendar size={14} />
                         {new Date(project.created).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                     </div>
                     <button style={{ 
                         background: 'none', border: 'none', color: 'var(--primary-indigo)', 
-                        fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer',
+                        fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: '4px' 
                     }}>
-                        View Details <ChevronRight size={14} />
+                        Manage <ChevronRight size={16} />
                     </button>
                 </div>
             </div>
         </div>
     );
-}
-
-// CheckCircle missing in imports above
-function CheckCircle({ size }) {
-    return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
 }
