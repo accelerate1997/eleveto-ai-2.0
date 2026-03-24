@@ -30,7 +30,7 @@ async function ensureAuth() {
         }
 
         console.log(`[Aria] 🔑 Authenticating to PocketBase as ${email}...`);
-        await pb.admins.authWithPassword(email, password);
+        await pb.collection('_superusers').authWithPassword(email, password);
         console.log(`[Aria] ✅ Authenticated successfully!`);
     } catch (err) {
         console.error('[Aria] PB Auth Error:', err.message);
