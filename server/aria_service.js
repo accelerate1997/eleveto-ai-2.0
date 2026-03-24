@@ -3,7 +3,7 @@
  * Aria — Eleveto WhatsApp AI Assistant
  * Loaded by the main server/index.js
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -27,7 +27,7 @@ function loadSystemPrompt() {
         + `\n\n[TODAY'S DATE: ${today}]`;
 }
 
-// In-memory session store: phone → conversation history array
+// In-memory session store: phone → conversation history
 const sessions = new Map();
 
 // De-duplication cache
@@ -47,58 +47,50 @@ export function isDuplicate(id) {
 }
 
 /**
- * Process an incoming message through Aria (Gemini 1.5 Flash).
+ * Process an incoming message through Aria (OpenAI).
+ * @param {OpenAI} openai - The shared OpenAI instance
  * @param {string} userInput - The incoming message text
  * @param {string} phone - The sender's phone number (digits only)
  * @returns {Promise<string>} - Aria's reply
  */
-export async function processAriaMessage(userInput, phone) {
+export async function processAriaMessage(openai, userInput, phone) {
     try {
-        if (!process.env.GEMINI_API_KEY) {
-            console.error('[Aria] Missing GEMINI_API_KEY in environment!');
-            return "My AI brain is currently disconnected (Missing API Key).";
-        }
-
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        
-        // Initialize the model with the system instruction
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash',
-            systemInstruction: loadSystemPrompt(),
-            generationConfig: {
-                temperature: 0.6,
-                maxOutputTokens: 600,
-            }
-        });
-
         if (!sessions.has(phone)) {
             console.log(`[Aria] New session for ${phone}`);
         }
 
-        // Gemini history format: { role: "user" | "model", parts: [{ text: "..." }] }
         const history = sessions.get(phone) || [];
 
-        // Start chat session with existing history
-        const chatSession = model.startChat({ history });
+        // Rebuild system prompt fresh each call (in case env changed, or date changed)
+        const systemPrompt = { role: 'system', content: loadSystemPrompt() };
 
-        // Send the new user message
-        const result = await chatSession.sendMessage(userInput);
-        const replyText = result.response.text().trim();
+        const messages = [systemPrompt, ...history, { role: 'user', content: userInput }];
 
-        // Push the new turn to our internal session map
-        history.push({ role: 'user', parts: [{ text: userInput }] });
-        history.push({ role: 'model', parts: [{ text: replyText }] });
-        
-        // Keep last 40 turns (20 pairs) to avoid token overflow
-        if (history.length > 40) history.splice(0, 2); 
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages,
+            temperature: 0.6,
+            max_tokens: 600
+        });
+
+        const replyText = response.choices[0].message.content?.trim()
+            || "I'm having a moment — could you say that again?";
+
+        // Persist to session (keep last 20 turns to avoid token overflow)
+        history.push({ role: 'user', content: userInput });
+        history.push({ role: 'assistant', content: replyText });
+        if (history.length > 40) history.splice(0, 2); // remove oldest turn
         sessions.set(phone, history);
 
         console.log(`[Aria → ${phone}]: ${replyText.substring(0, 100)}...`);
         return replyText;
 
     } catch (error) {
-        console.error('[Aria/Gemini Error]:', error.message || error);
-        return "Sorry, I ran into an issue connecting to my brain. Please try again shortly.";
+        console.error('[Aria/OpenAI Error]:', error.message);
+        if (error.status === 429) {
+            return "I'm a little overwhelmed right now — please try again in a moment! 🙏";
+        }
+        return "Sorry, I ran into an issue. Please try again shortly.";
     }
 }
 
