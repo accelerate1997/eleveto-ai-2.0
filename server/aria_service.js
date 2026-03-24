@@ -31,6 +31,7 @@ async function ensureAuth() {
 
         console.log(`[Aria] 🔑 Authenticating to PocketBase as ${email}...`);
         await pb.admins.authWithPassword(email, password);
+        console.log(`[Aria] ✅ Authenticated successfully!`);
     } catch (err) {
         console.error('[Aria] PB Auth Error:', err.message);
     }
@@ -78,12 +79,12 @@ const tools = [
         type: "function",
         function: {
             name: "save_lead",
-            description: "Save a qualified lead's contact information and business needs to the CRM. Call this only when you have collected enough info (Name, Interest/Problem, and optionally Investment).",
+            description: "MANDATORY: Save the qualified lead's contact information to the CRM. Call this as soon as you have the NAME and the BUSINESS INTEREST/PROBLEM. Do not wait for the end of the chat.",
             parameters: {
                 type: "object",
                 properties: {
                     name: { type: "string", description: "The lead's full name" },
-                    interest: { type: "string", description: "What they are interested in or the problem they want to solve" },
+                    interest: { type: "string", description: "The problem they want to solve or the business interest they shared" },
                     investment: { type: "string", description: "Their budget or investment capacity (if shared)" },
                     country: { type: "string", description: "Their location or country" },
                     notes: { type: "string", description: "Any additional context from the conversation" }
