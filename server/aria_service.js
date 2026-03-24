@@ -1,8 +1,4 @@
-/**
- * aria_service.js
- * Aria — Eleveto WhatsApp AI Assistant
- * Loaded by the main server/index.js
- */
+import * as dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
@@ -11,8 +7,12 @@ import PocketBase from 'pocketbase';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Load environment variables IMMEDIATELY
+dotenv.config({ path: join(__dirname, '../.env') });
+
 // Initialize PocketBase (Server-side)
 const pb = new PocketBase(process.env.VITE_PB_URL || 'http://localhost:8090');
+console.log(`[Aria] PocketBase URL: ${pb.baseUrl}`);
 
 /**
  * Ensure we are authenticated as admin to create/update leads.
