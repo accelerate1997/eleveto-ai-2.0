@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { pb } from '../lib/pocketbase';
-import { X, Mail, Phone, Linkedin, Globe, MapPin, Edit2, Trash2, Loader2, ExternalLink, Save, Calendar } from 'lucide-react';
+import { X, Mail, Phone, Linkedin, Globe, MapPin, Edit2, Trash2, Loader2, ExternalLink, Save, Calendar, TrendingUp } from 'lucide-react';
 
 export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted }) {
     const [isEditing, setIsEditing] = useState(false);
@@ -14,6 +14,7 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
         linkedin: lead.linkedin || '',
         google: lead.google || '',
         country: lead.country || '',
+        investment: lead.investment || '',
         followup_date: lead.followup_date ? lead.followup_date.split(' ')[0] : '',
     });
 
@@ -112,6 +113,7 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                                 { name: 'country', label: 'Country', type: 'text' },
                                 { name: 'linkedin', label: 'LinkedIn URL', type: 'url' },
                                 { name: 'google', label: 'Google Maps URL', type: 'url' },
+                                { name: 'investment', label: 'Investment', type: 'text' },
                                 ...(lead.status === 'Follow Up' || (form && form.status === 'Follow Up')
                                     ? [{ name: 'followup_date', label: '📅 Follow-up Date', type: 'date' }]
                                     : []),
@@ -129,6 +131,7 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                             <InfoRow icon={MapPin} label="Country" value={lead.country} />
                             <InfoRow icon={Linkedin} label="LinkedIn" value={lead.linkedin ? 'View Profile' : null} href={lead.linkedin || null} />
                             <InfoRow icon={Globe} label="Google Maps" value={lead.google ? 'View on Maps' : null} href={lead.google || null} />
+                            <InfoRow icon={TrendingUp} label="Investment" value={lead.investment} />
                             {lead.status === 'Follow Up' && (
                                 <InfoRow icon={Calendar} label="Follow-up Date" value={lead.followup_date ? new Date(lead.followup_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'} />
                             )}

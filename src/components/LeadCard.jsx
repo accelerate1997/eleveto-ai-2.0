@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { MapPin, MessageSquare, Linkedin, Globe, ChevronDown, Loader2, Phone } from 'lucide-react';
+import { MapPin, MessageSquare, Linkedin, Globe, ChevronDown, Loader2, Phone, TrendingUp } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import LeadDetailModal from './LeadDetailModal';
 
@@ -100,11 +100,21 @@ export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
                                 </div>
                             )}
  
-                            {/* Country */}
-                            {lead.country && lead.country !== 'N/A' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '0.75rem' }}>
-                                    <MapPin size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{lead.country}</span>
+                            {/* Country & Investment */}
+                            {(lead.country || lead.investment) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '0.75rem' }}>
+                                    {lead.country && lead.country !== 'N/A' && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <MapPin size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{lead.country}</span>
+                                        </div>
+                                    )}
+                                    {lead.investment && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <TrendingUp size={10} style={{ color: 'var(--primary-indigo)', flexShrink: 0 }} />
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--primary-indigo)', fontWeight: 700 }}>{lead.investment}</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
