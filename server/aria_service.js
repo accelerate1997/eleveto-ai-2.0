@@ -99,11 +99,11 @@ const tools = [
         type: "function",
         function: {
             name: "get_available_slots",
-            description: "Check for available strategy meeting slots on a specific date.",
+            description: "Check for available strategy meeting slots on a specific date. IMPORTANT: You MUST ask the user for their preferred date first before calling this tool. Do NOT guess the date.",
             parameters: {
                 type: "object",
                 properties: {
-                    date: { type: "string", description: "The date to check (YYYY-MM-DD)" }
+                    date: { type: "string", description: "The date provided by the user (YYYY-MM-DD)" }
                 },
                 required: ["date"]
             }
