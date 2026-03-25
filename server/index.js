@@ -230,8 +230,8 @@ app.get('/api/debug/lead', async (req, res) => {
     try {
         const { default: PocketBase } = await import('pocketbase');
         const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
-        const email = process.env.PB_ADMIN_EMAIL;
-        const password = process.env.PB_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+        const email = process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
+        const password = process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
         // Ensure we test the EXACT ensureAuth logic but expose the error
         if (!email || !password) {
@@ -294,8 +294,8 @@ app.post('/api/integrations/cal/sync', async (req, res) => {
         const { default: PocketBase } = await import('pocketbase');
         const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
         await pb.collection('_superusers').authWithPassword(
-            process.env.PB_ADMIN_EMAIL,
-            process.env.PB_ADMIN_PASSWORD
+            process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL,
+            process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD
         );
 
         let created = 0, updated = 0, skipped = 0;

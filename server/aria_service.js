@@ -22,8 +22,8 @@ async function ensureAuth() {
     try {
         if (pb.authStore.isValid) return;
 
-        const email = process.env.PB_ADMIN_EMAIL;
-        const password = process.env.PB_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+        const email = process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
+        const password = process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
         if (!email || !password) {
             console.warn('[Aria] PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD missing. Attempting public create.');
