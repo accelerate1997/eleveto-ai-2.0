@@ -227,6 +227,8 @@ async function handleTools(toolCalls, phone) {
         } else if (toolCall.function.name === 'book_meeting') {
             try {
                 const args = JSON.parse(toolCall.function.arguments);
+                console.log(`\n📅 [Aria Tool] Booking meeting for ${args.name} at ${args.start}`);
+                
                 const booking = await calService.createBooking({
                     name: args.name,
                     email: args.email,
@@ -236,33 +238,33 @@ async function handleTools(toolCalls, phone) {
 
                 // --- Sync to PocketBase 'bookings' collection ---
                 try {
-                    console.log(`\n📅 [Aria Tool] Syncing booking to PocketBase...`);
-                    await ensureAuth();
-                    
-                    // Try to find the lead ID to associate
-                    let leadId = '';
-                    try {
-                        const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
-                        leadId = lead.id;
-                    } catch (e) {
-                        console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
-                    }
+                   console.log(`   🔄 Syncing to PocketBase...`);
+                   await ensureAuth();
+                   
+                   // Try to find the lead ID to associate
+                   let leadId = null;
+                   try {
+                       const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
+                       if (lead) leadId = lead.id;
+                   } catch (e) {
+                       console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
+                   }
 
-                    // Map Cal.com status to our system status
-                    const status = (booking.status === 'ACCEPTED' || booking.status === 'confirmed') ? 'Scheduled' : 'Scheduled';
+                   // Map status
+                   const status = (booking.status === 'ACCEPTED' || booking.status === 'confirmed') ? 'Scheduled' : 'Scheduled';
 
-                    await pb.collection('bookings').create({
-                        title: `Strategy Meeting with ${args.name}`,
-                        lead_id: leadId,
-                        date: args.start,
-                        duration: 30, // Default duration
-                        status: status,
-                        meeting_link: booking.metadata?.videoCallUrl || '',
-                        notes: `Booked by Aria via Cal.com (ID: ${booking.id || 'N/A'})`
-                    });
-                    console.log(`   ✅ Booking synced to PocketBase!`);
+                   await pb.collection('bookings').create({
+                       title: `Strategy Meeting with ${args.name}`,
+                       lead_id: leadId, // Set to null if not found, not empty string
+                       date: args.start,
+                       duration: 30,
+                       status: status,
+                       meeting_link: booking.metadata?.videoCallUrl || '',
+                       notes: `Booked by Aria via Cal.com (ID: ${booking.id || 'N/A'})`
+                   });
+                   console.log(`   ✅ Booking synced successfully!`);
                 } catch (syncErr) {
-                    console.error(`   ⚠️ Failed to sync booking to PB:`, syncErr.message);
+                   console.error(`   ⚠️ Sync failed (ignoring to not break booking):`, syncErr.message);
                 }
                 // -----------------------------------------------
 
@@ -273,11 +275,12 @@ async function handleTools(toolCalls, phone) {
                     content: `SUCCESS: Meeting booked! Booking ID: ${booking.id}. Please confirm with the user.`
                 });
             } catch (err) {
+                console.error(`   ❌ Booking Error:`, err.message);
                 results.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
                     name: "book_meeting",
-                    content: `Error booking meeting: ${err.message}`
+                    content: `FAIL: Error booking meeting via Cal.com: ${err.message}. Please apologize and ask for assistance.`
                 });
             }
         }
