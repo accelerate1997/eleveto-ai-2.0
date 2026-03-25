@@ -254,18 +254,20 @@ async function handleTools(toolCalls, phone) {
                        console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
                    }
 
-                   // Map status
-                   const status = (booking.status === 'ACCEPTED' || booking.status === 'confirmed') ? 'Scheduled' : 'Scheduled';
-
-                   await pb.collection('bookings').create({
+                   // Build the booking record — only include meeting_link if it's a real URL
+                   const videoCallUrl = booking.metadata?.videoCallUrl;
+                   const bookingRecord = {
                        title: `Strategy Meeting with ${args.name}`,
-                       lead_id: leadId, // Set to null if not found, not empty string
                        date: args.start,
                        duration: 30,
-                       status: status,
-                       meeting_link: booking.metadata?.videoCallUrl || '',
-                       notes: `Booked by Aria via Cal.com (ID: ${booking.id || 'N/A'})`
-                   });
+                       status: 'Scheduled',
+                       notes: `Booked by Aria via Cal.com (ID: ${booking.id || 'N/A'})`,
+                   };
+                   // Only add optional fields if they have valid values
+                   if (leadId) bookingRecord.lead_id = leadId;
+                   if (videoCallUrl && videoCallUrl.startsWith('http')) bookingRecord.meeting_link = videoCallUrl;
+
+                   await pb.collection('bookings').create(bookingRecord);
                    console.log(`   ✅ Booking synced successfully!`);
                 } catch (syncErr) {
                    console.error(`   ⚠️ Sync failed (ignoring to not break booking):`, syncErr.message);
