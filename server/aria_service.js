@@ -159,7 +159,7 @@ async function handleTools(toolCalls, phone) {
                 if (existingRecord) {
                     console.log(`   🔄 Existing lead found: ${existingRecord.id}. Updating...`);
                     const updateData = { status: 'Qualified' };
-                    if (args.name) updateData.name = args.name;
+                    if (args.name && args.name.trim() !== '') updateData.name = args.name;
                     if (args.country) updateData.country = args.country;
                     if (args.investment) updateData.investment = args.investment;
                     if (args.interest) updateData.interest = args.interest;
@@ -168,14 +168,14 @@ async function handleTools(toolCalls, phone) {
                     console.log(`   ✅ Lead updated: ${record.id}`);
                 } else {
                     console.log(`   🆕 No existing lead for ${phone}. Creating new...`);
+                    const leadName = (args.name && args.name.trim() !== '') ? args.name : `Lead ${phone.slice(-4)}`;
                     const data = {
-                        name: args.name,
+                        name: leadName,
                         whatsapp: phone,
                         country: args.country || 'Unknown',
                         investment: args.investment || 'Not shared',
                         interest: args.interest || '',
                         notes: args.notes || '',
-                        email: '',
                         status: 'Qualified',
                     };
                     record = await pb.collection('leads').create(data);
@@ -328,7 +328,7 @@ export async function processAriaMessage(openai, userInput, phone) {
                 // Create draft lead if not found
                 leadRecord = await pb.collection('leads').create({
                     whatsapp: phone,
-                    name: 'Draft Lead',
+                    name: `Draft Lead (${phone.slice(-4)})`,
                     status: 'Qualified',
                     investment: 'Not shared',
                     country: 'Unknown'
