@@ -226,10 +226,11 @@ app.post('/api/scrape', async (req, res) => {
 
 // POST /api/integrations/cal/sync
 app.post('/api/integrations/cal/sync', async (req, res) => {
-    const { apiKey } = req.body;
+    // Use the UI-provided key, or fall back to the server's own key (same one Aria uses)
+    const apiKey = req.body.apiKey || process.env.CALCOM_API_KEY;
 
     if (!apiKey) {
-        return res.status(400).json({ error: 'Cal.com API Key is required' });
+        return res.status(400).json({ error: 'No Cal.com API Key configured. Set CALCOM_API_KEY in .env.' });
     }
 
     try {
@@ -237,6 +238,7 @@ app.post('/api/integrations/cal/sync', async (req, res) => {
         
         // 1. Fetch bookings from Cal.com
         const response = await fetch(`https://api.cal.com/v1/bookings?apiKey=${apiKey}&status=upcoming`);
+
         if (!response.ok) {
             const errData = await response.text();
             throw new Error(`Cal.com error: ${errData}`);
