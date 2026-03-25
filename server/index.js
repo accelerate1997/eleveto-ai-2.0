@@ -224,6 +224,45 @@ app.post('/api/scrape', async (req, res) => {
     }
 });
 
+// GET /api/debug/lead - Diagnostic endpoint for Live Environment Auth/Create testing
+app.get('/api/debug/lead', async (req, res) => {
+    if (req.query.key !== 'test1234') return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { default: PocketBase } = await import('pocketbase');
+        const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
+        const email = process.env.PB_ADMIN_EMAIL;
+        const password = process.env.PB_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+
+        // Ensure we test the EXACT ensureAuth logic but expose the error
+        if (!email || !password) {
+            return res.status(500).json({ error: 'Missing PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD in environment' });
+        }
+
+        await pb.collection('_superusers').authWithPassword(email, password);
+
+        // Attempt create
+        const data = {
+            whatsapp: '919999000333',
+            name: 'Live Server Debug Lead',
+            status: 'Qualified',
+            investment: 'Not shared',
+            country: 'Unknown'
+        };
+
+        const existing = await pb.collection('leads').getFirstListItem('whatsapp="919999000333"').catch(() => null);
+        if (existing) await pb.collection('leads').delete(existing.id);
+
+        const record = await pb.collection('leads').create(data);
+        res.json({ success: true, pbUrl: pb.baseUrl, emailLog: email, record });
+    } catch (err) {
+        res.status(500).json({ 
+            success: false, 
+            error: err.message, 
+            pbData: err.data 
+        });
+    }
+});
+
 // POST /api/integrations/cal/sync
 app.post('/api/integrations/cal/sync', async (req, res) => {
     // Use the UI-provided key, or fall back to the server's own key (same one Aria uses)
