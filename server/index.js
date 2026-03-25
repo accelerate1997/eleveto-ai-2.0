@@ -268,11 +268,21 @@ app.post('/api/integrations/cal/sync', async (req, res) => {
                     'pending': 'Scheduled',
                 };
                 const status = statusMap[booking.status?.toLowerCase()] || 'Scheduled';
-                const title = booking.title || `Meeting with ${booking.attendees?.[0]?.name || 'Guest'}`;
-                const date = booking.startTime;
-                const duration = booking.eventLength || 30;
+                const title = (booking.title || `Meeting with ${booking.attendees?.[0]?.name || 'Guest'}`).trim() || 'Cal.com Meeting';
+                const date = booking.startTime || booking.start;
+                // duration — Cal.com uses eventLength OR duration, sometimes both are missing
+                const rawDuration = booking.eventLength ?? booking.duration ?? booking.length;
+                const duration = (typeof rawDuration === 'number' && rawDuration > 0) ? rawDuration : 30;
                 const meetingLink = booking.metadata?.videoCallUrl || '';
                 const calId = String(booking.id);
+
+                // Skip if no valid date (can't save without it)
+                if (!date) {
+                    console.log(`  ⚠️ Skipping booking ${calId} — missing startTime`);
+                    skipped++;
+                    continue;
+                }
+
 
                 // Try to find existing record by cal booking ID in notes
                 let existingRecord = null;
