@@ -226,38 +226,89 @@ app.post('/api/scrape', async (req, res) => {
 
 // POST /api/integrations/cal/sync
 app.post('/api/integrations/cal/sync', async (req, res) => {
-    const { apiKey, userId } = req.body;
+    const { apiKey } = req.body;
 
     if (!apiKey) {
         return res.status(400).json({ error: 'Cal.com API Key is required' });
     }
 
     try {
-        console.log(`\n[Cal.com Sync] Fetching bookings for user: ${userId}`);
+        console.log(`\n[Cal.com Sync] Fetching bookings from Cal.com...`);
         
-        // 1. Fetch bookings from Cal.com API
-        const response = await fetch(`https://api.cal.com/v1/bookings?apiKey=${apiKey}`);
-        
+        // 1. Fetch bookings from Cal.com
+        const response = await fetch(`https://api.cal.com/v1/bookings?apiKey=${apiKey}&status=upcoming`);
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.message || 'Failed to fetch from Cal.com');
+            const errData = await response.text();
+            throw new Error(`Cal.com error: ${errData}`);
         }
 
         const data = await response.json();
         const calBookings = data.bookings || [];
-        console.log(`[Cal.com Sync] Found ${calBookings.length} bookings on Cal.com`);
+        console.log(`[Cal.com Sync] Found ${calBookings.length} bookings`);
 
-        // We'll return the bookings so the frontend can choose to save them 
-        // OR we'd need a way to connect to PB from here.
-        // For now, let's return them for the frontend to handle upserting
-        // to keep the backend simple (avoiding admin auth overhead here if possible).
-        
-        res.json({ success: true, bookings: calBookings });
+        // 2. Import PocketBase and upsert server-side
+        const { default: PocketBase } = await import('pocketbase');
+        const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
+        await pb.collection('_superusers').authWithPassword(
+            process.env.PB_ADMIN_EMAIL,
+            process.env.PB_ADMIN_PASSWORD
+        );
+
+        let created = 0, updated = 0, skipped = 0;
+
+        for (const booking of calBookings) {
+            try {
+                // Map Cal.com status
+                const statusMap = {
+                    'accepted': 'Scheduled',
+                    'confirmed': 'Scheduled',
+                    'cancelled': 'Cancelled',
+                    'pending': 'Scheduled',
+                };
+                const status = statusMap[booking.status?.toLowerCase()] || 'Scheduled';
+                const title = booking.title || `Meeting with ${booking.attendees?.[0]?.name || 'Guest'}`;
+                const date = booking.startTime;
+                const duration = booking.eventLength || 30;
+                const meetingLink = booking.metadata?.videoCallUrl || '';
+                const calId = String(booking.id);
+
+                // Try to find existing record by cal booking ID in notes
+                let existingRecord = null;
+                try {
+                    existingRecord = await pb.collection('bookings').getFirstListItem(`notes ~ "Cal.com ID: ${calId}"`);
+                } catch (e) { /* not found = create */ }
+
+                const record = {
+                    title,
+                    date,
+                    duration,
+                    status,
+                    notes: `Synced from Cal.com (Cal.com ID: ${calId})`,
+                };
+                if (meetingLink && meetingLink.startsWith('http')) record.meeting_link = meetingLink;
+
+                if (existingRecord) {
+                    await pb.collection('bookings').update(existingRecord.id, record);
+                    updated++;
+                } else {
+                    await pb.collection('bookings').create(record);
+                    created++;
+                }
+            } catch (upsertErr) {
+                console.error(`[Cal.com Sync] Failed to upsert booking ${booking.id}:`, upsertErr.message);
+                skipped++;
+            }
+        }
+
+        console.log(`[Cal.com Sync] Done. Created: ${created}, Updated: ${updated}, Skipped: ${skipped}`);
+        res.json({ success: true, total: calBookings.length, created, updated, skipped });
+
     } catch (err) {
         console.error('[Cal.com Sync] Error:', err.message);
         res.status(500).json({ error: err.message || 'Sync failed' });
     }
 });
+
 
 /**
  * Evolution API WhatsApp Integration

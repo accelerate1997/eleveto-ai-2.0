@@ -74,50 +74,21 @@ export default function BookingManagement() {
             const response = await fetch(`${apiBase}/api/integrations/cal/sync`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apiKey: calApiKey, userId: pb.authStore.model?.id })
+                body: JSON.stringify({ apiKey: calApiKey })
             });
 
-            if (!response.ok) throw new Error('Sync failed');
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || 'Sync failed');
+            }
             
             const data = await response.json();
-            const calBookings = data.bookings || [];
-            
-            // Sync logic: upsert into PocketBase
-            console.log(`BookingSync: Processing ${calBookings.length} items...`);
-            for (const cal of calBookings) {
-                const startTime = cal.startTime || cal.start;
-                const status = (cal.status === 'ACCEPTED' || cal.status === 'confirmed') ? 'Scheduled' : 'Canceled';
-                
-                const bookingData = {
-                    title: cal.title || 'Cal.com Meeting',
-                    date: startTime,
-                    duration: parseInt(cal.duration || 30, 10),
-                    status: status,
-                    meeting_link: cal.metadata?.videoCallUrl || '',
-                    notes: `Synced from Cal.com (ID: ${cal.id || 'N/A'})`,
-                };
-
-                console.log("BookingSync: Sending payload:", bookingData);
-
-                // Try to find if this booking already exists
-                const existing = bookings.find(b => 
-                    b.title === bookingData.title && 
-                    b.date.substring(0, 16) === bookingData.date.substring(0, 16)
-                );
-                
-                if (existing) {
-                    console.log(`BookingSync: Updating existing ID ${existing.id}`);
-                    await pb.collection('bookings').update(existing.id, bookingData);
-                } else {
-                    console.log("BookingSync: Creating new record");
-                    await pb.collection('bookings').create(bookingData);
-                }
-            }
-
-            alert(`Successfully synced ${calBookings.length} bookings from Cal.com!`);
+            // Server now handles all PocketBase writes — just refresh the local list
+            alert(`Sync complete! ${data.created} new bookings added, ${data.updated} updated.`);
             fetchData();
         } catch (err) {
             console.error('Sync error:', err);
+
             alert('Failed to sync: ' + err.message);
         } finally {
             setIsSyncing(false);
