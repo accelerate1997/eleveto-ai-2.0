@@ -63,18 +63,13 @@ export default function BookingManagement() {
     }, []);
 
     const handleSyncCal = async () => {
-        if (!calApiKey) {
-            alert("No Cal.com API key found. Please connect it in the Integrations page.");
-            return;
-        }
-
         setIsSyncing(true);
         try {
             const apiBase = import.meta.env.VITE_API_URL || '';
             const response = await fetch(`${apiBase}/api/integrations/cal/sync`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apiKey: calApiKey })
+                body: JSON.stringify({})
             });
 
             if (!response.ok) {
@@ -83,12 +78,13 @@ export default function BookingManagement() {
             }
             
             const data = await response.json();
-            // Server now handles all PocketBase writes — just refresh the local list
-            alert(`Sync complete! ${data.created} new bookings added, ${data.updated} updated.`);
+            const total = data.created != null
+                ? `${data.created} new, ${data.updated} updated`
+                : `${(data.bookings || []).length} bookings loaded`;
+            alert(`Sync complete! ${total}.`);
             fetchData();
         } catch (err) {
             console.error('Sync error:', err);
-
             alert('Failed to sync: ' + err.message);
         } finally {
             setIsSyncing(false);
