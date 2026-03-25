@@ -153,10 +153,12 @@ async function handleTools(toolCalls, phone) {
                     if (args.name) updateData.name = args.name;
                     if (args.country) updateData.country = args.country;
                     if (args.investment) updateData.investment = args.investment;
+                    if (args.interest) updateData.interest = args.interest; // Added
                     if (args.notes) updateData.notes = args.notes;
                     
+                    updateData.status = 'Qualified'; // Added
                     record = await pb.collection('leads').update(record.id, updateData);
-                    console.log(`   ✅ Lead updated!`);
+                    console.log(`   ✅ Lead updated: ${record.id}`); // Modified log
                 } catch (findErr) {
                     // Record not found, create new
                     console.log(`   🆕 No existing lead found for ${phone}. Creating new...`);
@@ -165,13 +167,15 @@ async function handleTools(toolCalls, phone) {
                         whatsapp: phone,
                         country: args.country || 'Unknown',
                         investment: args.investment || 'Not shared',
+                        interest: args.interest || '', // Added
+                        notes: args.notes || '', // Added
                         linkedin: '', 
                         google: '',   
                         email: '',    
                         status: 'Qualified',
                     };
                     record = await pb.collection('leads').create(data);
-                    console.log(`   ✅ Lead created! ID: ${record.id}`);
+                    console.log(`   ✅ New lead created: ${record.id}`); // Modified log
                 }
 
                 results.push({
