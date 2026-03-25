@@ -144,38 +144,42 @@ async function handleTools(toolCalls, phone) {
                 await ensureAuth();
 
                 // 2. Check if lead already exists (by phone)
-                let record;
+                let existingRecord = null;
                 try {
-                    record = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
-                    console.log(`   🔄 Existing lead found: ${record.id}. Updating...`);
-                    
-                    const updateData = {};
+                    existingRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
+                } catch (findErr) {
+                    if (findErr.status !== 404) {
+                        // A real error (auth, network) — rethrow so it's properly caught
+                        throw findErr;
+                    }
+                    // 404 = not found, we'll create below
+                }
+
+                let record;
+                if (existingRecord) {
+                    console.log(`   🔄 Existing lead found: ${existingRecord.id}. Updating...`);
+                    const updateData = { status: 'Qualified' };
                     if (args.name) updateData.name = args.name;
                     if (args.country) updateData.country = args.country;
                     if (args.investment) updateData.investment = args.investment;
-                    if (args.interest) updateData.interest = args.interest; // Added
+                    if (args.interest) updateData.interest = args.interest;
                     if (args.notes) updateData.notes = args.notes;
-                    
-                    updateData.status = 'Qualified'; // Added
-                    record = await pb.collection('leads').update(record.id, updateData);
-                    console.log(`   ✅ Lead updated: ${record.id}`); // Modified log
-                } catch (findErr) {
-                    // Record not found, create new
-                    console.log(`   🆕 No existing lead found for ${phone}. Creating new...`);
+                    record = await pb.collection('leads').update(existingRecord.id, updateData);
+                    console.log(`   ✅ Lead updated: ${record.id}`);
+                } else {
+                    console.log(`   🆕 No existing lead for ${phone}. Creating new...`);
                     const data = {
                         name: args.name,
                         whatsapp: phone,
                         country: args.country || 'Unknown',
                         investment: args.investment || 'Not shared',
-                        interest: args.interest || '', // Added
-                        notes: args.notes || '', // Added
-                        linkedin: '', 
-                        google: '',   
-                        email: '',    
+                        interest: args.interest || '',
+                        notes: args.notes || '',
+                        email: '',
                         status: 'Qualified',
                     };
                     record = await pb.collection('leads').create(data);
-                    console.log(`   ✅ New lead created: ${record.id}`); // Modified log
+                    console.log(`   ✅ New lead created: ${record.id}`);
                 }
 
                 results.push({
@@ -245,11 +249,18 @@ async function handleTools(toolCalls, phone) {
                    console.log(`   🔄 Syncing to PocketBase...`);
                    await ensureAuth();
                    
-                   // Try to find the lead ID to associate
+                   // Try to find the lead and update with email
                    let leadId = null;
                    try {
                        const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
-                       if (lead) leadId = lead.id;
+                       if (lead) {
+                           leadId = lead.id;
+                           // Also save the email to the lead record
+                           if (args.email && !lead.email) {
+                               await pb.collection('leads').update(lead.id, { email: args.email });
+                               console.log(`   📧 Email saved to lead: ${args.email}`);
+                           }
+                       }
                    } catch (e) {
                        console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
                    }
