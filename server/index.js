@@ -235,7 +235,10 @@ app.get('/api/debug/lead', async (req, res) => {
 
         // Ensure we test the EXACT ensureAuth logic but expose the error
         if (!email || !password) {
-            return res.status(500).json({ error: 'Missing PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD in environment' });
+            return res.status(500).json({ 
+                error: 'Missing PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD in environment',
+                foundKeys: Object.keys(process.env).filter(k => k.includes('PB') || k.includes('ADMIN') || k.includes('EMAIL'))
+            });
         }
 
         await pb.collection('_superusers').authWithPassword(email, password);
