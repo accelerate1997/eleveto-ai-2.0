@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../.env') });
 
 // Initialize PocketBase (Server-side)
-const pb = new PocketBase(process.env.VITE_PB_URL || 'http://localhost:8090');
+const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
 console.log(`[Aria] PocketBase URL: ${pb.baseUrl}`);
 
 /**
