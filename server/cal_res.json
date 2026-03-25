@@ -1,0 +1,110 @@
+{
+  "id": 17503404,
+  "uid": "5vjRkpav1VwQBYriic4hGZ",
+  "idempotencyKey": "22c7239e-bc79-5058-a8ad-957a843b24a8",
+  "userId": 1323206,
+  "userPrimaryEmail": "jashavantgoswami@gmail.com",
+  "eventTypeId": 5000586,
+  "title": "15 Demo of Real Estate Flow between Jashavant Goswami and Test Success",
+  "description": "",
+  "customInputs": {},
+  "responses": {
+    "name": "Test Success",
+    "email": "test_success@example.com",
+    "title": "Strategy Meeting with Test Success",
+    "attendeePhoneNumber": "+918268919143"
+  },
+  "startTime": "2026-03-30T08:30:00.000Z",
+  "endTime": "2026-03-30T08:45:00.000Z",
+  "location": "integrations:google:meet",
+  "createdAt": "2026-03-25T08:20:38.664Z",
+  "updatedAt": "2026-03-25T08:20:38.664Z",
+  "status": "ACCEPTED",
+  "paid": false,
+  "destinationCalendarId": 427507,
+  "cancellationReason": null,
+  "rejectionReason": null,
+  "reassignReason": null,
+  "reassignById": null,
+  "dynamicEventSlugRef": null,
+  "dynamicGroupSlugRef": null,
+  "rescheduled": null,
+  "fromReschedule": null,
+  "recurringEventId": null,
+  "smsReminderNumber": null,
+  "scheduledJobs": [],
+  "metadata": {},
+  "isRecorded": false,
+  "iCalUID": "5vjRkpav1VwQBYriic4hGZ@Cal.com",
+  "iCalSequence": 0,
+  "rating": null,
+  "ratingFeedback": null,
+  "noShowHost": false,
+  "oneTimePassword": null,
+  "cancelledBy": null,
+  "rescheduledBy": null,
+  "creationSource": "API_V1",
+  "user": {
+    "uuid": "1cd57150-3f11-451e-9960-4bc45eeb0cc1",
+    "email": null,
+    "name": "Jashavant Goswami",
+    "timeZone": "Asia/Kolkata",
+    "username": "jashavant-goswami-elevetoai",
+    "isPlatformManaged": false
+  },
+  "attendees": [
+    {
+      "id": 21072963,
+      "email": "test_success@example.com",
+      "name": "Test Success",
+      "timeZone": "Asia/Kolkata",
+      "phoneNumber": "+918268919143",
+      "locale": "en",
+      "bookingId": 17503404,
+      "noShow": false
+    }
+  ],
+  "payment": [],
+  "references": [
+    {
+      "type": "google_calendar",
+      "uid": "_6lr6kkjbe1gnccamet8k4mbid5km6d388td40gr1dgn66rrd",
+      "thirdPartyRecurringEventId": null,
+      "meetingId": "_6lr6kkjbe1gnccamet8k4mbid5km6d388td40gr1dgn66rrd",
+      "meetingPassword": "",
+      "meetingUrl": "https://meet.google.com/nnd-gqae-zco",
+      "externalCalendarId": "jashavantgoswami@gmail.com",
+      "credentialId": 698375
+    },
+    {
+      "type": "google_meet_video",
+      "meetingUrl": "https://meet.google.com/nnd-gqae-zco",
+      "uid": "5vjRkpav1VwQBYriic4hGZ",
+      "credentialId": 698375
+    }
+  ],
+  "userUuid": "1cd57150-3f11-451e-9960-4bc45eeb0cc1",
+  "appsStatus": [
+    {
+      "appName": "Google Calendar",
+      "type": "google_calendar",
+      "success": 1,
+      "failures": 0,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "appName": "Google Meet",
+      "type": "conferencing",
+      "success": 1,
+      "failures": 0,
+      "errors": []
+    }
+  ],
+  "paymentRequired": false,
+  "luckyUsers": [],
+  "isDryRun": false,
+  "videoCallUrl": "https://meet.google.com/nnd-gqae-zco",
+  "organizationId": null,
+  "previousBooking": null
+}

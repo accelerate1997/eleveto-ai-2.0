@@ -1,0 +1,204 @@
+{
+  "event_type": {
+    "id": 5000586,
+    "title": "15 Demo of Real Estate Flow",
+    "slug": "15-demo-of-real-estate-flow",
+    "length": 15,
+    "hidden": false,
+    "position": 0,
+    "userId": 1323206,
+    "teamId": null,
+    "scheduleId": 443875,
+    "eventName": null,
+    "timeZone": null,
+    "periodType": "UNLIMITED",
+    "periodStartDate": null,
+    "periodEndDate": null,
+    "periodDays": null,
+    "periodCountCalendarDays": null,
+    "requiresConfirmation": false,
+    "recurringEvent": null,
+    "disableGuests": false,
+    "hideCalendarNotes": false,
+    "minimumBookingNotice": 360,
+    "beforeEventBuffer": 10,
+    "afterEventBuffer": 0,
+    "schedulingType": null,
+    "price": 0,
+    "currency": "usd",
+    "slotInterval": 30,
+    "parentId": null,
+    "successRedirectUrl": null,
+    "description": "This will give a demo of the Real Estate Flow system, specially designed for Real Estate experts like you.<br>1) How does this system work?<br>2) How can your business grow using this System?<br>3) How You Can Customise it according to you and Your Business?",
+    "locations": [
+      {
+        "type": "integrations:google:meet"
+      }
+    ],
+    "metadata": null,
+    "seatsPerTimeSlot": null,
+    "seatsShowAttendees": false,
+    "seatsShowAvailabilityCount": true,
+    "bookingFields": [
+      {
+        "name": "name",
+        "type": "name",
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system",
+        "required": true,
+        "defaultLabel": "your_name"
+      },
+      {
+        "name": "email",
+        "type": "email",
+        "hidden": false,
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system-but-optional",
+        "required": false,
+        "defaultLabel": "email_address"
+      },
+      {
+        "name": "attendeePhoneNumber",
+        "type": "phone",
+        "hidden": false,
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system-but-optional",
+        "required": true,
+        "defaultLabel": "phone_number"
+      },
+      {
+        "name": "location",
+        "type": "radioInput",
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system",
+        "required": false,
+        "defaultLabel": "location",
+        "getOptionsAt": "locations",
+        "optionsInputs": {
+          "phone": {
+            "type": "phone",
+            "required": true,
+            "placeholder": ""
+          },
+          "somewhereElse": {
+            "type": "text",
+            "required": true,
+            "placeholder": ""
+          },
+          "attendeeInPerson": {
+            "type": "address",
+            "required": true,
+            "placeholder": ""
+          }
+        },
+        "hideWhenJustOneOption": true
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "hidden": true,
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system-but-optional",
+        "required": true,
+        "defaultLabel": "what_is_this_meeting_about",
+        "defaultPlaceholder": ""
+      },
+      {
+        "name": "notes",
+        "type": "textarea",
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system-but-optional",
+        "required": false,
+        "defaultLabel": "additional_notes",
+        "defaultPlaceholder": "share_additional_notes"
+      },
+      {
+        "name": "guests",
+        "type": "multiemail",
+        "hidden": false,
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system-but-optional",
+        "required": false,
+        "defaultLabel": "additional_guests",
+        "defaultPlaceholder": "email"
+      },
+      {
+        "name": "rescheduleReason",
+        "type": "textarea",
+        "views": [
+          {
+            "id": "reschedule",
+            "label": "Reschedule View"
+          }
+        ],
+        "sources": [
+          {
+            "id": "default",
+            "type": "default",
+            "label": "Default"
+          }
+        ],
+        "editable": "system-but-optional",
+        "required": false,
+        "defaultLabel": "reason_for_reschedule",
+        "defaultPlaceholder": "reschedule_placeholder"
+      }
+    ],
+    "bookingLimits": {},
+    "onlyShowFirstAvailableSlot": false,
+    "durationLimits": null,
+    "customInputs": [],
+    "hashedLink": [],
+    "team": null,
+    "hosts": [],
+    "owner": {
+      "username": "jashavant-goswami-elevetoai",
+      "id": 1323206,
+      "timeZone": "Asia/Kolkata"
+    },
+    "children": [],
+    "link": "https://cal.com/jashavant-goswami-elevetoai/15-demo-of-real-estate-flow"
+  }
+}

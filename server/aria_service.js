@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import PocketBase from 'pocketbase';
+import * as calService from './cal_service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,11 +87,42 @@ const tools = [
                 properties: {
                     name: { type: "string", description: "The lead's full name" },
                     interest: { type: "string", description: "The problem they want to solve or the business interest they shared" },
-                    investment: { type: "string", description: "Their budget or investment capacity (if shared)" },
+                    investment: { type: "string", description: "The investment amount they are willing to put towards their growth (e.g., '500k', 'flexible', etc.). NEVER use the word 'budget'." },
                     country: { type: "string", description: "Their location or country" },
                     notes: { type: "string", description: "Any additional context from the conversation" }
                 },
                 required: ["name", "interest"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_available_slots",
+            description: "Check for available strategy meeting slots on a specific date.",
+            parameters: {
+                type: "object",
+                properties: {
+                    date: { type: "string", description: "The date to check (YYYY-MM-DD)" }
+                },
+                required: ["date"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "book_meeting",
+            description: "Book a strategy meeting for the lead. Call this ONLY after checking availability and getting the user's confirmation.",
+            parameters: {
+                type: "object",
+                properties: {
+                    name: { type: "string", description: "Lead's full name" },
+                    email: { type: "string", description: "Lead's email address" },
+                    phone: { type: "string", description: "Lead's phone number (MANDATORY for booking)" },
+                    start: { type: "string", description: "Selected slot in ISO format (e.g., 2026-03-27T10:00:00Z)" }
+                },
+                required: ["name", "email", "phone", "start"]
             }
         }
     }
@@ -111,20 +143,36 @@ async function handleTools(toolCalls, phone) {
                 // 1. Authenticate as admin before database operation
                 await ensureAuth();
 
-                const data = {
-                    name: args.name,
-                    whatsapp: phone,
-                    country: args.country || 'Unknown',
-                    investment: args.investment || 'Not shared',
-                    linkedin: '', 
-                    google: '',   
-                    email: '',    
-                    status: 'Qualified',
-                };
-
-                // 2. Create the record
-                const record = await pb.collection('leads').create(data);
-                console.log(`   ✅ Lead saved! ID: ${record.id}`);
+                // 2. Check if lead already exists (by phone)
+                let record;
+                try {
+                    record = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
+                    console.log(`   🔄 Existing lead found: ${record.id}. Updating...`);
+                    
+                    const updateData = {};
+                    if (args.name) updateData.name = args.name;
+                    if (args.country) updateData.country = args.country;
+                    if (args.investment) updateData.investment = args.investment;
+                    if (args.notes) updateData.notes = args.notes;
+                    
+                    record = await pb.collection('leads').update(record.id, updateData);
+                    console.log(`   ✅ Lead updated!`);
+                } catch (findErr) {
+                    // Record not found, create new
+                    console.log(`   🆕 No existing lead found for ${phone}. Creating new...`);
+                    const data = {
+                        name: args.name,
+                        whatsapp: phone,
+                        country: args.country || 'Unknown',
+                        investment: args.investment || 'Not shared',
+                        linkedin: '', 
+                        google: '',   
+                        email: '',    
+                        status: 'Qualified',
+                    };
+                    record = await pb.collection('leads').create(data);
+                    console.log(`   ✅ Lead created! ID: ${record.id}`);
+                }
 
                 results.push({
                     tool_call_id: toolCall.id,
@@ -141,6 +189,95 @@ async function handleTools(toolCalls, phone) {
                     role: "tool",
                     name: "save_lead",
                     content: "FAIL: Could not save lead to CRM due to a technical error."
+                });
+            }
+        } else if (toolCall.function.name === 'get_available_slots') {
+            try {
+                const args = JSON.parse(toolCall.function.arguments);
+                const slots = await calService.getAvailableSlots(args.date);
+                
+                // Format slots to IST for the AI to present correctly
+                const istSlots = slots.map(slot => {
+                    const date = new Date(slot);
+                    const ist = date.toLocaleTimeString('en-IN', { 
+                        timeZone: 'Asia/Kolkata', 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    });
+                    return `${ist} (ISO: ${slot})`;
+                });
+
+                results.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: "get_available_slots",
+                    content: istSlots.length > 0 
+                        ? `Available slots for ${args.date} in IST: ${istSlots.join(', ')}. PROMPT: Present these times in IST to the user. Use the ISO string in parentheses when calling book_meeting.`
+                        : `No slots available for ${args.date}. Please try another date.`
+                });
+            } catch (err) {
+                results.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: "get_available_slots",
+                    content: `Error checking slots: ${err.message}`
+                });
+            }
+        } else if (toolCall.function.name === 'book_meeting') {
+            try {
+                const args = JSON.parse(toolCall.function.arguments);
+                const booking = await calService.createBooking({
+                    name: args.name,
+                    email: args.email,
+                    phone: args.phone,
+                    start: args.start
+                });
+
+                // --- Sync to PocketBase 'bookings' collection ---
+                try {
+                    console.log(`\n📅 [Aria Tool] Syncing booking to PocketBase...`);
+                    await ensureAuth();
+                    
+                    // Try to find the lead ID to associate
+                    let leadId = '';
+                    try {
+                        const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
+                        leadId = lead.id;
+                    } catch (e) {
+                        console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
+                    }
+
+                    // Map Cal.com status to our system status
+                    const status = (booking.status === 'ACCEPTED' || booking.status === 'confirmed') ? 'Scheduled' : 'Scheduled';
+
+                    await pb.collection('bookings').create({
+                        title: `Strategy Meeting with ${args.name}`,
+                        lead_id: leadId,
+                        date: args.start,
+                        duration: 30, // Default duration
+                        status: status,
+                        meeting_link: booking.metadata?.videoCallUrl || '',
+                        notes: `Booked by Aria via Cal.com (ID: ${booking.id || 'N/A'})`
+                    });
+                    console.log(`   ✅ Booking synced to PocketBase!`);
+                } catch (syncErr) {
+                    console.error(`   ⚠️ Failed to sync booking to PB:`, syncErr.message);
+                }
+                // -----------------------------------------------
+
+                results.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: "book_meeting",
+                    content: `SUCCESS: Meeting booked! Booking ID: ${booking.id}. Please confirm with the user.`
+                });
+            } catch (err) {
+                results.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: "book_meeting",
+                    content: `Error booking meeting: ${err.message}`
                 });
             }
         }
@@ -160,6 +297,36 @@ export async function processAriaMessage(openai, userInput, phone) {
         const history = sessions.get(phone) || [];
         const systemPrompt = { role: 'system', content: loadSystemPrompt() };
         let messages = [systemPrompt, ...history, { role: 'user', content: userInput }];
+
+        // --- Persistence: LOG USER MESSAGE ---
+        try {
+            await ensureAuth();
+            let leadRecord;
+            try {
+                leadRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
+            } catch (e) {
+                // Create draft lead if not found
+                leadRecord = await pb.collection('leads').create({
+                    whatsapp: phone,
+                    name: 'Draft Lead',
+                    status: 'Qualified',
+                    investment: 'Not shared',
+                    country: 'Unknown'
+                });
+                console.log(`[Aria Log] Draft lead created for ${phone} to start logging.`);
+            }
+
+            if (leadRecord) {
+                await pb.collection('messages').create({
+                    lead: leadRecord.id,
+                    role: 'user',
+                    content: userInput
+                });
+            }
+        } catch (logErr) {
+            console.error('[Aria Log Error] User message:', logErr.message);
+        }
+        // -------------------------------------
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -183,6 +350,21 @@ export async function processAriaMessage(openai, userInput, phone) {
 
             const finalReply = secondResponse.choices[0].message.content || "Success — I've updated your status.";
             
+            // --- Persistence: LOG ASSISTANT MESSAGE ---
+            try {
+                const leadRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
+                if (leadRecord) {
+                    await pb.collection('messages').create({
+                        lead: leadRecord.id,
+                        role: 'assistant',
+                        content: finalReply
+                    });
+                }
+            } catch (logErr) {
+                console.error('[Aria Log Error] Assistant response:', logErr.message);
+            }
+            // ------------------------------------------
+
             history.push({ role: 'user', content: userInput });
             history.push({ role: 'assistant', content: finalReply });
             if (history.length > 40) history.splice(0, 2);
@@ -193,6 +375,21 @@ export async function processAriaMessage(openai, userInput, phone) {
 
         const replyText = responseMessage.content?.trim()
             || "I'm having a moment — could you say that again?";
+
+        // --- Persistence: LOG ASSISTANT RESPONSE ---
+        try {
+            const leadRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
+            if (leadRecord) {
+                await pb.collection('messages').create({
+                    lead: leadRecord.id,
+                    role: 'assistant',
+                    content: replyText
+                });
+            }
+        } catch (logErr) {
+            console.error('[Aria Log Error] Assistant response:', logErr.message);
+        }
+        // ------------------------------------------
 
         history.push({ role: 'user', content: userInput });
         history.push({ role: 'assistant', content: replyText });

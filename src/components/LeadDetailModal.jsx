@@ -7,6 +7,9 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState('details'); // 'details' | 'conversation'
+    const [messages, setMessages] = useState([]);
+    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [form, setForm] = useState({
         name: lead.name || '',
         email: lead.email || '',
@@ -32,7 +35,6 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
             setIsSaving(false);
         }
     };
-
     const handleDelete = async () => {
         if (!confirm(`Delete "${lead.name}"? This cannot be undone.`)) return;
         setIsDeleting(true);
@@ -45,6 +47,27 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
             setIsDeleting(false);
         }
     };
+
+    const fetchMessages = async () => {
+        setIsLoadingMessages(true);
+        try {
+            const records = await pb.collection('messages').getFullList({
+                filter: `lead = "${lead.id}"`,
+                sort: 'id',
+            });
+            setMessages(records);
+        } catch (err) {
+            console.error('Failed to fetch messages:', err);
+        } finally {
+            setIsLoadingMessages(false);
+        }
+    };
+
+    React.useEffect(() => {
+        if (activeTab === 'conversation') {
+            fetchMessages();
+        }
+    }, [activeTab]);
 
     const InfoRow = ({ icon: Icon, label, value, href }) => (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem 0', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
@@ -102,49 +125,120 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                     </div>
                 </div>
 
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: '1.5rem', padding: '0 1.75rem', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                    {['details', 'conversation'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                padding: '1rem 0.25rem',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: activeTab === tab ? '2px solid var(--primary-indigo)' : '2px solid transparent',
+                                color: activeTab === tab ? 'var(--primary-indigo)' : '#64748b',
+                                fontWeight: 700,
+                                fontSize: '0.85rem',
+                                textTransform: 'capitalize',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+
                 {/* Body */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 1.75rem' }}>
-                    {isEditing ? (
-                        <div style={{ paddingTop: '0.75rem' }}>
-                            {[
-                                { name: 'name', label: 'Name', type: 'text' },
-                                { name: 'email', label: 'Email', type: 'email' },
-                                { name: 'whatsapp', label: 'WhatsApp', type: 'text' },
-                                { name: 'country', label: 'Country', type: 'text' },
-                                { name: 'linkedin', label: 'LinkedIn URL', type: 'url' },
-                                { name: 'google', label: 'Google Maps URL', type: 'url' },
-                                { name: 'investment', label: 'Investment', type: 'text' },
-                                ...(lead.status === 'Follow Up' || (form && form.status === 'Follow Up')
-                                    ? [{ name: 'followup_date', label: '📅 Follow-up Date', type: 'date' }]
-                                    : []),
-                            ].map(field => (
-                                <div key={field.name} className="form-group" style={{ marginBottom: '1rem' }}>
-                                    <label htmlFor={`edit-${field.name}`}>{field.label}</label>
-                                    <input id={`edit-${field.name}`} name={field.name} type={field.type} value={form[field.name]} onChange={handleChange} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ paddingTop: '0.25rem' }}>
-                            <InfoRow icon={Mail} label="Email" value={lead.email} href={lead.email ? `mailto:${lead.email}` : null} />
-                            <InfoRow icon={Phone} label="WhatsApp" value={lead.whatsapp} href={lead.whatsapp ? `https://wa.me/${lead.whatsapp.replace(/\D/g, '')}` : null} />
-                            <InfoRow icon={MapPin} label="Country" value={lead.country} />
-                            <InfoRow icon={Linkedin} label="LinkedIn" value={lead.linkedin ? 'View Profile' : null} href={lead.linkedin || null} />
-                            <InfoRow icon={Globe} label="Google Maps" value={lead.google ? 'View on Maps' : null} href={lead.google || null} />
-                            <InfoRow icon={TrendingUp} label="Investment" value={lead.investment} />
-                            {lead.status === 'Follow Up' && (
-                                <InfoRow icon={Calendar} label="Follow-up Date" value={lead.followup_date ? new Date(lead.followup_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'} />
-                            )}
-                            <div style={{ padding: '0.75rem 0', fontSize: '0.75rem', color: '#64748b', borderTop: '1px solid rgba(255, 255, 255, 0.05)', marginTop: '0.5rem' }}>
-                                <div style={{ marginBottom: '4px' }}>
-                                    Added {new Date(lead.created).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                </div>
-                                {lead.expand?.created_by && (
-                                    <div style={{ color: 'var(--primary-indigo)', fontWeight: 700 }}>
-                                        Source Agent: {lead.expand.created_by.name || lead.expand.created_by.username}
+                    {activeTab === 'details' ? (
+                        isEditing ? (
+                            <div style={{ paddingTop: '0.75rem' }}>
+                                {[
+                                    { name: 'name', label: 'Name', type: 'text' },
+                                    { name: 'email', label: 'Email', type: 'email' },
+                                    { name: 'whatsapp', label: 'WhatsApp', type: 'text' },
+                                    { name: 'country', label: 'Country', type: 'text' },
+                                    { name: 'linkedin', label: 'LinkedIn URL', type: 'url' },
+                                    { name: 'google', label: 'Google Maps URL', type: 'url' },
+                                    { name: 'investment', label: 'Investment', type: 'text' },
+                                    ...(lead.status === 'Follow Up' || (form && form.status === 'Follow Up')
+                                        ? [{ name: 'followup_date', label: '📅 Follow-up Date', type: 'date' }]
+                                        : []),
+                                ].map(field => (
+                                    <div key={field.name} className="form-group" style={{ marginBottom: '1rem' }}>
+                                        <label htmlFor={`edit-${field.name}`}>{field.label}</label>
+                                        <input id={`edit-${field.name}`} name={field.name} type={field.type} value={form[field.name]} onChange={handleChange} />
                                     </div>
-                                )}
+                                ))}
                             </div>
+                        ) : (
+                            <div style={{ paddingTop: '0.25rem' }}>
+                                <InfoRow icon={Mail} label="Email" value={lead.email} href={lead.email ? `mailto:${lead.email}` : null} />
+                                <InfoRow icon={Phone} label="WhatsApp" value={lead.whatsapp} href={lead.whatsapp ? `https://wa.me/${lead.whatsapp.replace(/\D/g, '')}` : null} />
+                                <InfoRow icon={MapPin} label="Country" value={lead.country} />
+                                <InfoRow icon={Linkedin} label="LinkedIn" value={lead.linkedin ? 'View Profile' : null} href={lead.linkedin || null} />
+                                <InfoRow icon={Globe} label="Google Maps" value={lead.google ? 'View on Maps' : null} href={lead.google || null} />
+                                <InfoRow icon={TrendingUp} label="Investment" value={lead.investment} />
+                                {lead.status === 'Follow Up' && (
+                                    <InfoRow icon={Calendar} label="Follow-up Date" value={lead.followup_date ? new Date(lead.followup_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'} />
+                                )}
+                                <div style={{ padding: '0.75rem 0', fontSize: '0.75rem', color: '#64748b', borderTop: '1px solid rgba(255, 255, 255, 0.05)', marginTop: '0.5rem' }}>
+                                    <div style={{ marginBottom: '4px' }}>
+                                        Added {new Date(lead.created).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </div>
+                                    {lead.expand?.created_by && (
+                                        <div style={{ color: 'var(--primary-indigo)', fontWeight: 700 }}>
+                                            Source Agent: {lead.expand.created_by.name || lead.expand.created_by.username}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    ) : (
+                        /* Conversation Tab */
+                        <div style={{ padding: '1rem 0' }}>
+                            {isLoadingMessages ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '2rem 0', color: '#64748b' }}>
+                                    <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                                    <span style={{ fontSize: '0.85rem' }}>Loading conversation...</span>
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '3rem 0', color: '#94a3b8' }}>
+                                    <div style={{ marginBottom: '10px' }}>💬</div>
+                                    <p style={{ fontSize: '0.875rem' }}>No messages found for this lead.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {messages.map((msg, i) => (
+                                        <div 
+                                            key={msg.id} 
+                                            style={{ 
+                                                display: 'flex', 
+                                                flexDirection: 'column', 
+                                                alignItems: msg.role === 'user' ? 'flex-start' : 'flex-end',
+                                                maxWidth: '85%',
+                                                alignSelf: msg.role === 'user' ? 'flex-start' : 'flex-end'
+                                            }}
+                                        >
+                                            <div style={{ 
+                                                padding: '0.75rem 1rem', 
+                                                borderRadius: msg.role === 'user' ? '16px 16px 16px 4px' : '16px 16px 4px 16px',
+                                                background: msg.role === 'user' ? 'rgba(79, 70, 229, 0.08)' : 'linear-gradient(135deg, #6366f1, #3b82f6)',
+                                                color: msg.role === 'user' ? 'var(--text-primary)' : 'white',
+                                                fontSize: '0.875rem',
+                                                lineHeight: 1.5,
+                                                border: msg.role === 'user' ? '1px solid rgba(79, 70, 229, 0.15)' : 'none'
+                                            }}>
+                                                {msg.content}
+                                            </div>
+                                            <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '4px', padding: '0 4px' }}>
+                                                {new Date(msg.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

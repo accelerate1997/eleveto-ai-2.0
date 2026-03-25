@@ -1,0 +1,1 @@
+Cal.com Booking Error: {"message":"no_available_users_found_error","data":{"traceId":"trace_uo_FgskEk4csc6WS0Ib1R"}}
