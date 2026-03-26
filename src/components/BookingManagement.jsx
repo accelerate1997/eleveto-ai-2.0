@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { pb } from '../lib/pocketbase';
-import { Calendar, Clock, Link as LinkIcon, Users, Edit3, CheckCircle, XCircle, Search, RefreshCw, AlertCircle, Plus } from 'lucide-react';
+import { Calendar, Clock, Link as LinkIcon, Users, Edit3, CheckCircle, XCircle, Search, RefreshCw, AlertCircle, Plus, Trash2 } from 'lucide-react';
 
 export default function BookingManagement() {
     const [bookings, setBookings] = useState([]);
@@ -176,6 +176,26 @@ export default function BookingManagement() {
             alert('Failed to update status: ' + (err.message || 'Unknown error'));
         }
     };
+    
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this meeting?')) return;
+        try {
+            const apiBase = import.meta.env.VITE_API_URL || '';
+            const response = await fetch(`${apiBase}/api/bookings/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || 'Delete failed');
+            }
+            
+            setBookings(prev => prev.filter(b => b.id !== id));
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('Failed to delete: ' + err.message);
+        }
+    };
 
     const filtered = bookings.filter(b => {
         const query = search.toLowerCase();
@@ -341,7 +361,7 @@ export default function BookingManagement() {
                         ) : (
                             <div className="bookings-grid">
                                 {upcomingBookings.map(b => (
-                                    <BookingCard key={b.id} booking={b} onEdit={handleOpenSchedule} onStatusChange={handleUpdateStatus} />
+                                    <BookingCard key={b.id} booking={b} onEdit={handleOpenSchedule} onStatusChange={handleUpdateStatus} onDelete={handleDelete} />
                                 ))}
                             </div>
                         )}
@@ -356,7 +376,7 @@ export default function BookingManagement() {
                             </h2>
                             <div className="bookings-grid">
                                 {pastBookings.map(b => (
-                                    <BookingCard key={b.id} booking={b} onEdit={handleOpenSchedule} onStatusChange={handleUpdateStatus} isPast />
+                                    <BookingCard key={b.id} booking={b} onEdit={handleOpenSchedule} onStatusChange={handleUpdateStatus} onDelete={handleDelete} isPast />
                                 ))}
                             </div>
                         </section>
@@ -464,7 +484,7 @@ export default function BookingManagement() {
 }
 
 // ── Shared Card Component ──────────────────────────────────────────────────
-function BookingCard({ booking, onEdit, onStatusChange, isPast }) {
+function BookingCard({ booking, onEdit, onStatusChange, onDelete, isPast }) {
     const lead = booking.expand?.lead_id;
     const dateObj = new Date(booking.date);
 
@@ -497,9 +517,22 @@ function BookingCard({ booking, onEdit, onStatusChange, isPast }) {
                         {lead ? lead.name : 'Unknown Contact'}
                     </div>
                 </div>
-                <span style={{ background: sColor.bg, color: sColor.text, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
-                    {booking.status}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ background: sColor.bg, color: sColor.text, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                        {booking.status}
+                    </span>
+                    <button 
+                        onClick={() => onDelete(booking.id)}
+                        className="btn-delete-meeting"
+                        style={{
+                            width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fecaca'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fee2e2'; }}
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
             </div>
 
             <div style={{ background: 'var(--neural-bg)', padding: '1rem', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', border: '1px solid rgba(0, 0, 0, 0.05)' }}>

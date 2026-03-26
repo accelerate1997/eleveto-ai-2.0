@@ -246,42 +246,76 @@ async function handleTools(toolCalls, phone) {
 
                 // --- Sync to PocketBase 'bookings' collection ---
                 try {
-                   console.log(`   🔄 Syncing to PocketBase...`);
-                   await ensureAuth();
-                   
-                   // Try to find the lead and update with email
-                   let leadId = null;
-                   try {
-                       const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
-                       if (lead) {
-                           leadId = lead.id;
-                           // Also save the email to the lead record
-                           if (args.email && !lead.email) {
-                               await pb.collection('leads').update(lead.id, { email: args.email });
-                               console.log(`   📧 Email saved to lead: ${args.email}`);
-                           }
-                       }
-                   } catch (e) {
-                       console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
-                   }
+                    console.log(`   🔄 Syncing to PocketBase...`);
+                    await ensureAuth();
+                    
+                    // Try to find the lead and update with email
+                    let leadId = null;
+                    try {
+                        const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
+                        if (lead) {
+                            leadId = lead.id;
+                            // Also save the email to the lead record
+                            if (args.email && !lead.email) {
+                                await pb.collection('leads').update(lead.id, { email: args.email });
+                                console.log(`   📧 Email saved to lead: ${args.email}`);
+                            }
+                        }
+                    } catch (e) {
+                        console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
+                    }
 
-                   // Build the booking record — only include meeting_link if it's a real URL
-                   const videoCallUrl = booking.metadata?.videoCallUrl;
-                   const bookingRecord = {
-                       title: `Strategy Meeting with ${args.name}`,
-                       date: args.start,
-                       duration: 30,
-                       status: 'Scheduled',
-                       notes: `Booked by Aria via Cal.com (ID: ${booking.id || 'N/A'})`,
-                   };
-                   // Only add optional fields if they have valid values
-                   if (leadId) bookingRecord.lead_id = leadId;
-                   if (videoCallUrl && videoCallUrl.startsWith('http')) bookingRecord.meeting_link = videoCallUrl;
+                    // Build the booking record
+                    console.log(`   📦 Cal.com response keys:`, Object.keys(booking));
+                    // Cal.com v1 sometimes returns { booking: { ... } }, sometimes just the object
+                    const b = booking.booking || booking;
+                    const bookingId = b.id || 'N/A';
+                    const bookingUid = b.uid || '';
+                    
+                    const videoCallUrl = b.metadata?.videoCallUrl || b.videoCallUrl || '';
+                    const rescheduleUrl = bookingUid ? `https://cal.com/reschedule/${bookingUid}` : '';
+                    
+                    const bookingRecord = {
+                        title: `Strategy Meeting with ${args.name}`,
+                        date: args.start,
+                        duration: 30,
+                        status: 'Scheduled',
+                        notes: `Booked by Aria via Cal.com (ID: ${bookingId})`,
+                        reschedule_link: rescheduleUrl,
+                        reminders_sent: ['confirmed'] // PocketBase JS SDK handles arrays for JSON fields
+                    };
+                    // Only add optional fields if they have valid values
+                    if (leadId) bookingRecord.lead_id = leadId;
+                    if (videoCallUrl && videoCallUrl.startsWith('http')) {
+                        bookingRecord.meeting_link = videoCallUrl;
+                    }
 
-                   await pb.collection('bookings').create(bookingRecord);
-                   console.log(`   ✅ Booking synced successfully!`);
+                    await pb.collection('bookings').create(bookingRecord);
+                    console.log(`   ✅ Booking synced successfully! (ID: ${bookingId})`);
+
+                    // --- Immediate Confirmation Message ---
+                    const formattedTime = new Date(args.start).toLocaleString('en-IN', {
+                        timeZone: 'Asia/Kolkata',
+                        dateStyle: 'full',
+                        timeStyle: 'short'
+                    });
+
+                    const confirmationText = `✅ *Meeting Confirmed!*
+
+Hi ${args.name}, your Strategy Meeting is booked.
+
+📅 *Date:* ${formattedTime}
+🔗 *Meeting Link:* ${videoCallUrl || 'Sent via email'}
+🔄 *Reschedule:* ${rescheduleUrl || 'Check your email'}
+
+I'll send you a few reminders before we start. See you then! 👋`;
+                    
+                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_Global';
+                    await sendWhatsAppMessage(phone, confirmationText, instanceName);
+                    console.log(`   📱 Confirmation sent to ${phone} using instance ${instanceName}`);
+
                 } catch (syncErr) {
-                   console.error(`   ⚠️ Sync failed (ignoring to not break booking):`, syncErr.message);
+                    console.error(`   ⚠️ Sync failed (ignoring to not break booking):`, syncErr.message);
                 }
                 // -----------------------------------------------
 

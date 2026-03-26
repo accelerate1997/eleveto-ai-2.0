@@ -12,6 +12,7 @@ import {
     clearAriaSession,
     getAriaSessionCount
 } from './aria_service.js';
+import { startReminderService } from './reminder_service.js';
 
 dotenv.config({ path: '../.env' }); // Fallback to local .env if present
 // Process environment variables will already be populated by Docker/Compose
@@ -266,31 +267,116 @@ app.get('/api/debug/lead', async (req, res) => {
     }
 });
 
-// POST /api/integrations/cal/sync
-app.post('/api/integrations/cal/sync', async (req, res) => {
-    // Use the UI-provided key, or fall back to the server's own key (same one Aria uses)
-    const apiKey = req.body.apiKey || process.env.CALCOM_API_KEY;
+/**
+ * Reusable Cal.com Sync Logic
+ */
+async function syncCalBookings(apiKey) {
+    if (!apiKey) apiKey = process.env.CALCOM_API_KEY;
+    if (!apiKey) throw new Error('No Cal.com API Key configured.');
 
-    if (!apiKey) {
-        return res.status(400).json({ error: 'No Cal.com API Key configured. Set CALCOM_API_KEY in .env.' });
+    console.log(`\n[Cal.com Sync] 🔄 Fetching bookings from Cal.com...`);
+    
+    // 1. Fetch upcoming bookings from Cal.com
+    const response = await fetch(`https://api.cal.com/v1/bookings?apiKey=${apiKey}&status=upcoming`);
+
+    if (!response.ok) {
+        const errData = await response.text();
+        throw new Error(`Cal.com error: ${errData}`);
     }
 
-    try {
-        console.log(`\n[Cal.com Sync] Fetching bookings from Cal.com...`);
-        
-        // 1. Fetch bookings from Cal.com
-        const response = await fetch(`https://api.cal.com/v1/bookings?apiKey=${apiKey}&status=upcoming`);
+    const data = await response.json();
+    const calBookings = data.bookings || [];
+    console.log(`[Cal.com Sync] 📥 Found ${calBookings.length} upcoming bookings`);
 
-        if (!response.ok) {
-            const errData = await response.text();
-            throw new Error(`Cal.com error: ${errData}`);
+    // 2. Import PocketBase and upsert server-side
+    const { default: PocketBase } = await import('pocketbase');
+    const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
+    await pb.collection('_superusers').authWithPassword(
+        process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL,
+        process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD
+    );
+
+    let created = 0, updated = 0, skipped = 0;
+    const now = new Date();
+
+    for (const booking of calBookings) {
+        try {
+            const date = booking.startTime || booking.start;
+            const startTime = new Date(date);
+
+            // STRICT FILTER: Only sync meetings that haven't started yet
+            if (startTime < now) {
+                console.log(`  ⏭️ Skipping past booking ${booking.id} (${date})`);
+                continue;
+            }
+
+            const statusMap = {
+                'accepted': 'Scheduled',
+                'confirmed': 'Scheduled',
+                'cancelled': 'Cancelled',
+                'pending': 'Scheduled',
+            };
+            const status = statusMap[booking.status?.toLowerCase()] || 'Scheduled';
+            const title = (booking.title || `Meeting with ${booking.attendees?.[0]?.name || 'Guest'}`).trim() || 'Cal.com Meeting';
+            const rawDuration = booking.eventLength ?? booking.duration ?? booking.length;
+            const duration = (typeof rawDuration === 'number' && rawDuration > 0) ? rawDuration : 30;
+            const meetingLink = booking.metadata?.videoCallUrl || '';
+            const calId = String(booking.id);
+            const rescheduleUrl = booking.uid ? `https://cal.com/reschedule/${booking.uid}` : '';
+
+            // Try to find existing record by cal booking ID in notes
+            let existingRecord = null;
+            try {
+                existingRecord = await pb.collection('bookings').getFirstListItem(`notes ~ "Cal.com ID: ${calId}"`);
+            } catch (e) { /* not found = create */ }
+
+            const record = {
+                title,
+                date,
+                duration,
+                status,
+                notes: `Synced from Cal.com (Cal.com ID: ${calId})`,
+                reschedule_link: rescheduleUrl,
+            };
+            if (meetingLink && meetingLink.startsWith('http')) record.meeting_link = meetingLink;
+
+            if (existingRecord) {
+                // Initialize reminders_sent if it was null/empty for existing records
+                if (!existingRecord.reminders_sent) {
+                    record.reminders_sent = [];
+                }
+                await pb.collection('bookings').update(existingRecord.id, record);
+                updated++;
+            } else {
+                record.reminders_sent = [];
+                await pb.collection('bookings').create(record);
+                created++;
+            }
+        } catch (upsertErr) {
+            console.error(`[Cal.com Sync] Failed to upsert booking ${booking.id}:`, upsertErr.message);
+            skipped++;
         }
+    }
 
-        const data = await response.json();
-        const calBookings = data.bookings || [];
-        console.log(`[Cal.com Sync] Found ${calBookings.length} bookings`);
+    console.log(`[Cal.com Sync] ✅ Done. Created: ${created}, Updated: ${updated}, Skipped: ${skipped}`);
+    return { total: calBookings.length, created, updated, skipped };
+}
 
-        // 2. Import PocketBase and upsert server-side
+// POST /api/integrations/cal/sync
+app.post('/api/integrations/cal/sync', async (req, res) => {
+    try {
+        const result = await syncCalBookings(req.body.apiKey);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('[Cal.com Sync API] Error:', err.message);
+        res.status(500).json({ error: err.message || 'Sync failed' });
+    }
+});
+
+// DELETE /api/bookings/:id
+app.delete('/api/bookings/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
         const { default: PocketBase } = await import('pocketbase');
         const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
         await pb.collection('_superusers').authWithPassword(
@@ -298,70 +384,19 @@ app.post('/api/integrations/cal/sync', async (req, res) => {
             process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD
         );
 
-        let created = 0, updated = 0, skipped = 0;
-
-        for (const booking of calBookings) {
-            try {
-                // Map Cal.com status
-                const statusMap = {
-                    'accepted': 'Scheduled',
-                    'confirmed': 'Scheduled',
-                    'cancelled': 'Cancelled',
-                    'pending': 'Scheduled',
-                };
-                const status = statusMap[booking.status?.toLowerCase()] || 'Scheduled';
-                const title = (booking.title || `Meeting with ${booking.attendees?.[0]?.name || 'Guest'}`).trim() || 'Cal.com Meeting';
-                const date = booking.startTime || booking.start;
-                // duration — Cal.com uses eventLength OR duration, sometimes both are missing
-                const rawDuration = booking.eventLength ?? booking.duration ?? booking.length;
-                const duration = (typeof rawDuration === 'number' && rawDuration > 0) ? rawDuration : 30;
-                const meetingLink = booking.metadata?.videoCallUrl || '';
-                const calId = String(booking.id);
-
-                // Skip if no valid date (can't save without it)
-                if (!date) {
-                    console.log(`  ⚠️ Skipping booking ${calId} — missing startTime`);
-                    skipped++;
-                    continue;
-                }
-
-
-                // Try to find existing record by cal booking ID in notes
-                let existingRecord = null;
-                try {
-                    existingRecord = await pb.collection('bookings').getFirstListItem(`notes ~ "Cal.com ID: ${calId}"`);
-                } catch (e) { /* not found = create */ }
-
-                const record = {
-                    title,
-                    date,
-                    duration,
-                    status,
-                    notes: `Synced from Cal.com (Cal.com ID: ${calId})`,
-                };
-                if (meetingLink && meetingLink.startsWith('http')) record.meeting_link = meetingLink;
-
-                if (existingRecord) {
-                    await pb.collection('bookings').update(existingRecord.id, record);
-                    updated++;
-                } else {
-                    await pb.collection('bookings').create(record);
-                    created++;
-                }
-            } catch (upsertErr) {
-                console.error(`[Cal.com Sync] Failed to upsert booking ${booking.id}:`, upsertErr.message);
-                skipped++;
-            }
-        }
-
-        console.log(`[Cal.com Sync] Done. Created: ${created}, Updated: ${updated}, Skipped: ${skipped}`);
-        res.json({ success: true, total: calBookings.length, created, updated, skipped });
-
+        await pb.collection('bookings').delete(id);
+        console.log(`[API] 🗑️ Booking deleted: ${id}`);
+        res.json({ success: true, message: 'Booking deleted successfully' });
     } catch (err) {
-        console.error('[Cal.com Sync] Error:', err.message);
-        res.status(500).json({ error: err.message || 'Sync failed' });
+        console.error('[API] Delete Error:', err.message);
+        res.status(500).json({ error: err.message || 'Failed to delete booking' });
     }
 });
+
+// Automated Sync Interval (Every 60 minutes)
+setInterval(() => {
+    syncCalBookings().catch(err => console.error('[Auto Sync] Error:', err.message));
+}, 60 * 60 * 1000);
 
 
 /**
@@ -606,6 +641,9 @@ app.get('/api/aria/status', (req, res) => {
         recentWebhooks: ariaRecentWebhooks
     });
 });
+
+// Start the automated reminder service (checks every 15 minutes)
+startReminderService(15);
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Eleveto Server → http://0.0.0.0:${PORT}`);
