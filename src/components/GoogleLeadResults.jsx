@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { pb } from '../lib/pocketbase';
 import { ExternalLink, Phone, Star, Users, Plus, Download, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
-export default function GoogleLeadResults({ results, searchQuery }) {
+export default function GoogleLeadResults({ results, searchQuery, industry }) {
     const [addedIds, setAddedIds] = useState(new Set());
     const [loadingIds, setLoadingIds] = useState(new Set());
     const [isBulkLoading, setIsBulkLoading] = useState(false);
@@ -26,6 +26,21 @@ export default function GoogleLeadResults({ results, searchQuery }) {
         const id = lead.maps_link || lead.name;
         setLoadingIds(prev => new Set(prev).add(id));
         try {
+            // Check for potential duplicates first
+            let existing = null;
+            if (lead.phone) {
+                existing = await pb.collection('leads').getFirstListItem(`whatsapp="${lead.phone}"`).catch(() => null);
+            }
+            if (!existing && lead.maps_link) {
+                existing = await pb.collection('leads').getFirstListItem(`google="${lead.maps_link}"`).catch(() => null);
+            }
+
+            if (existing) {
+                console.log(`Lead already exists: ${existing.id}`);
+                setAddedIds(prev => new Set(prev).add(id));
+                return;
+            }
+
             const payload = {
                 name: lead.name || 'Unknown Business',
                 status: 'Lead',
@@ -35,10 +50,12 @@ export default function GoogleLeadResults({ results, searchQuery }) {
             };
             if (lead.phone) payload.whatsapp = lead.phone;
             if (lead.maps_link) payload.google = lead.maps_link;
+            if (industry) payload.industry = industry;
 
             await pb.collection('leads').create(payload);
             setAddedIds(prev => new Set(prev).add(id));
         } catch (err) {
+            console.error('Failed to add lead:', err);
             alert('Failed to add lead: ' + (err.message || 'Unknown error'));
         } finally {
             setLoadingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
