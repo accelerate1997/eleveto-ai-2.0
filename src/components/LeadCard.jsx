@@ -163,11 +163,18 @@ export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
                                 </div>
                             </div>
 
-                            {/* Follow-up Date — only shown when status is Follow Up */}
+                            {/* Follow-up Date & Sequence Progress */}
                             {currentStatus === 'Follow Up' && (
                                 <div onClick={e => e.stopPropagation()} style={{ marginBottom: '0.5rem' }}>
-                                    <div style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '3px' }}>
-                                        📅 Follow-up Date
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                        <div style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#f59e0b' }}>
+                                            📅 Follow-up Date
+                                        </div>
+                                        {lead.followup_count > 0 && (
+                                            <div style={{ fontSize: '0.62rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.1)', padding: '1px 5px', borderRadius: '4px', color: '#d97706' }}>
+                                                Sequence: {lead.followup_count}/7
+                                            </div>
+                                        )}
                                     </div>
                                     <div style={{ position: 'relative' }}>
                                         <input

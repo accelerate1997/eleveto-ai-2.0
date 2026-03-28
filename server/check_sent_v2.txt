@@ -1,0 +1,7 @@
+﻿[dotenv@17.3.1] injecting env (11) from ..\.env -- tip: ΓÜí∩╕Å secrets for agents: https://dotenvx.com/as2
+Booking d0f2j6oyzpua9t3:
+  Title: Strategy Meeting with Jash
+  Reminders Sent: ["confirmed"]
+Booking bfi3p55q0smijmi:
+  Title: 15 Demo of Real Estate Flow between Jashavant Goswami and Jash
+  Reminders Sent: []

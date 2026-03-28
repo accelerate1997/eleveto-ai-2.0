@@ -12,7 +12,8 @@ import {
     clearAriaSession,
     getAriaSessionCount
 } from './aria_service.js';
-import { startReminderService } from './reminder_service.js';
+import { checkAndSendReminders, startReminderService } from './reminder_service.js';
+import { startFollowupService } from './followup_service.js';
 
 dotenv.config({ path: '../.env' }); // Fallback to local .env if present
 // Process environment variables will already be populated by Docker/Compose
@@ -644,6 +645,9 @@ app.get('/api/aria/status', (req, res) => {
 
 // Start the automated reminder service (checks every 15 minutes)
 startReminderService(15);
+
+// Start Follow-up Service (7-day sequence check every 2 hours)
+startFollowupService(2);
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Eleveto Server → http://0.0.0.0:${PORT}`);

@@ -196,7 +196,7 @@ export default function GoogleLeadGen() {
 
             {/* Results Section */}
             {results !== null && (
-                <GoogleLeadResults results={results} searchQuery={lastQuery} />
+                <GoogleLeadResults results={results} searchQuery={lastQuery} industry={form.industry} />
             )}
         </div>
     );

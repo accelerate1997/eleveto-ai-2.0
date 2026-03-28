@@ -89,6 +89,7 @@ const tools = [
                     interest: { type: "string", description: "The problem they want to solve or the business interest they shared" },
                     investment: { type: "string", description: "The investment amount they are willing to put towards their growth (e.g., '500k', 'flexible', etc.). NEVER use the word 'budget'." },
                     country: { type: "string", description: "Their location or country" },
+                    industry: { type: "string", description: "The specific industry their business operates in (e.g., Real Estate, E-commerce, Healthcare)" },
                     notes: { type: "string", description: "Any additional context from the conversation" }
                 },
                 required: ["name", "interest"]
@@ -164,21 +165,22 @@ async function handleTools(toolCalls, phone) {
                     if (args.investment) updateData.investment = args.investment;
                     if (args.interest) updateData.interest = args.interest;
                     if (args.notes) updateData.notes = args.notes;
+                    if (args.industry) updateData.industry = args.industry;
                     record = await pb.collection('leads').update(existingRecord.id, updateData);
                     console.log(`   ✅ Lead updated: ${record.id}`);
                 } else {
                     console.log(`   🆕 No existing lead for ${phone}. Creating new...`);
-                    const leadName = (args.name && args.name.trim() !== '') ? args.name : `Lead ${phone.slice(-4)}`;
-                    const data = {
-                        name: leadName,
+                    await ensureAuth();
+                    const leadData = {
                         whatsapp: phone,
-                        country: args.country || 'Unknown',
-                        investment: args.investment || 'Not shared',
-                        interest: args.interest || '',
-                        notes: args.notes || '',
+                        name: args.name || `Lead ${phone.slice(-4)}`,
+                        notes: `Interest: ${args.interest}\nInvestment: ${args.investment || 'Not shared'}\nLocation: ${args.country || 'Not shared'}\nContext: ${args.notes || 'None'}`,
                         status: 'Qualified',
+                        source: 'WhatsApp AI'
                     };
-                    record = await pb.collection('leads').create(data);
+
+                    if (args.industry) leadData.industry = args.industry;
+                    record = await pb.collection('leads').create(leadData);
                     console.log(`   ✅ New lead created: ${record.id}`);
                 }
 
