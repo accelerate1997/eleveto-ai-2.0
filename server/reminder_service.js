@@ -15,7 +15,13 @@ async function ensureAuth() {
         const email = process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
         const password = process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
         if (!email || !password) return;
-        await pb.collection('_superusers').authWithPassword(email, password);
+
+        try {
+            await pb.collection('_superusers').authWithPassword(email, password);
+        } catch (e) {
+            // Fallback for older PocketBase versions
+            await pb.admins.authWithPassword(email, password);
+        }
     } catch (err) {
         console.error('[Reminder Service] PB Auth Error:', err.message);
     }
@@ -30,29 +36,41 @@ export async function checkAndSendReminders() {
     try {
         await ensureAuth();
         
-        // Fetch all scheduled bookings within the next 25 hours
-        const now = new Date();
-        const tomorrow = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+        // Fetch ALL scheduled bookings (we'll filter in JS to be safe with timezones)
+        const bookings = await pb.collection('bookings').getFullList({ 
+            filter: 'status="Scheduled"', 
+            expand: 'lead_id',
+            sort: 'date'
+        });
         
-        const filter = `status="Scheduled" && date >= "${now.toISOString()}" && date <= "${tomorrow.toISOString()}"`;
-        const bookings = await pb.collection('bookings').getFullList({ filter, expand: 'lead_id' });
-        console.log(`[Reminder Service] 📝 Found ${bookings.length} upcoming bookings in window.`);
+        console.log(`[Reminder Service] 📝 Found ${bookings.length} upcoming scheduled bookings.`);
+
+        const now = new Date(); // Re-initialize strictly to ensure freshness
 
         for (const booking of bookings) {
             const meetingDate = new Date(booking.date);
             const diffMs = meetingDate - now;
             const diffHours = diffMs / (1000 * 60 * 60);
             
-            // reminders_sent is stored as JSON array in PocketBase
+            console.log(`[Reminder Service]   - Booking ${booking.id}: T-minus ${diffHours.toFixed(2)}h`);
+
+            // Skip past meetings
+            if (diffHours < 0) continue;
+            // Only consider meetings in the next 30 hours
+            if (diffHours > 30) continue;
+
             let sent = [];
             try {
                 if (Array.isArray(booking.reminders_sent)) {
                     sent = booking.reminders_sent;
-                } else if (typeof booking.reminders_sent === 'string') {
-                    sent = JSON.parse(booking.reminders_sent);
+                } else if (booking.reminders_sent && typeof booking.reminders_sent === 'string') {
+                    // Try parsing if it's a string, handle empty/malformed
+                    if (booking.reminders_sent.trim().startsWith('[')) {
+                        sent = JSON.parse(booking.reminders_sent);
+                    }
                 }
             } catch (e) { 
-                console.warn(`[Reminder Service] ⚠️ Failed to parse reminders_sent for booking ${booking.id}`);
+                console.warn(`[Reminder Service] ⚠️ Failed to parse reminders_sent for booking ${booking.id}:`, e.message);
                 sent = []; 
             }
 
@@ -94,7 +112,8 @@ export async function checkAndSendReminders() {
 
                     const msg = `🔔 *Reminder:* Hi ${name}, your Strategy Meeting is scheduled for *${threshold.label}* at ${formattedTime} (${formattedDate}).\n\n🔗 *Meeting Link:* ${booking.meeting_link || 'Sent via email'}\n🔄 *Reschedule:* ${booking.reschedule_link || 'Check your email'}\n\nSee you soon! 👋`;
                     
-                    const success = await sendWhatsAppMessage(phone, msg, 'Aria');
+                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_Global';
+                    const success = await sendWhatsAppMessage(phone, msg, instanceName);
                     if (success) {
                         sent.push(threshold.id);
                         await pb.collection('bookings').update(booking.id, { reminders_sent: sent });
