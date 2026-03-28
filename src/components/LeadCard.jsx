@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { MapPin, MessageSquare, Linkedin, Globe, ChevronDown, Loader2, Phone, TrendingUp } from 'lucide-react';
+import { MapPin, MessageSquare, Linkedin, Globe, ChevronDown, Loader2, Phone, TrendingUp, Briefcase } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import LeadDetailModal from './LeadDetailModal';
 
@@ -109,6 +109,12 @@ export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <MapPin size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{lead.country}</span>
+                                        </div>
+                                    )}
+                                    {lead.industry && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <Briefcase size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{lead.industry}</span>
                                         </div>
                                     )}
                                     {lead.investment && (
