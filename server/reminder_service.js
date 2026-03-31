@@ -112,7 +112,7 @@ export async function checkAndSendReminders() {
 
                     const msg = `🔔 *Reminder:* Hi ${name}, your Strategy Meeting is scheduled for *${threshold.label}* at ${formattedTime} (${formattedDate}).\n\n🔗 *Meeting Link:* ${booking.meeting_link || 'Sent via email'}\n🔄 *Reschedule:* ${booking.reschedule_link || 'Check your email'}\n\nSee you soon! 👋`;
                     
-                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_Global';
+                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
                     const success = await sendWhatsAppMessage(phone, msg, instanceName);
                     if (success) {
                         sent.push(threshold.id);

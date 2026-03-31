@@ -67,7 +67,7 @@ async function debug() {
         // 4. Connection Check
         console.log(`\n📱 Testing WhatsApp Connection...`);
         const testPhone = '918268919143'; // User's number from previous logs
-        const instanceName = process.env.INSTANCE_NAME || 'Eleveto_Global';
+        const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
         console.log(`  Using Instance: ${instanceName}`);
         
         const success = await sendWhatsAppMessage(testPhone, '🔔 *System Check:* If you see this, the server can send reminders to your WhatsApp! ✅', instanceName);

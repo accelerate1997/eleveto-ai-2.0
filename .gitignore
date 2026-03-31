@@ -26,3 +26,8 @@ dist-ssr
 *.sln
 *.sw?
 *.ps1
+
+# Application specific logs and diagnostic files
+server/*.txt
+server/*.log
+*.local

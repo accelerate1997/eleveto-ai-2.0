@@ -228,7 +228,8 @@ app.post('/api/scrape', async (req, res) => {
 
 // GET /api/debug/lead - Diagnostic endpoint for Live Environment Auth/Create testing
 app.get('/api/debug/lead', async (req, res) => {
-    if (req.query.key !== 'test1234') return res.status(401).json({ error: 'Unauthorized' });
+    const debugKey = process.env.DEBUG_KEY || 'aria_debug_default_key_99';
+    if (req.query.key !== debugKey) return res.status(401).json({ error: 'Unauthorized' });
     try {
         const { default: PocketBase } = await import('pocketbase');
         const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
@@ -607,7 +608,7 @@ app.post('/webhook', async (req, res) => {
         if (!text) return;
 
         const phone = remoteJid.split('@')[0];
-        const instanceName = req.body.instance || process.env.INSTANCE_NAME || 'Eleveto_Global';
+        const instanceName = req.body.instance || process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
 
         console.log(`\n📨 [Aria] From ${phone}: ${text}`);
 
@@ -638,7 +639,7 @@ app.get('/api/aria/status', (req, res) => {
     res.json({
         status: 'ARIA_ALIVE',
         activeSessions: getAriaSessionCount(),
-        instance: process.env.INSTANCE_NAME || 'Eleveto_Global',
+        instance: process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv',
         recentWebhooks: ariaRecentWebhooks
     });
 });

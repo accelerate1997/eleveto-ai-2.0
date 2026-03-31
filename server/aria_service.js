@@ -284,7 +284,7 @@ async function handleTools(toolCalls, phone) {
                         status: 'Scheduled',
                         notes: `Booked by Aria via Cal.com (ID: ${bookingId})`,
                         reschedule_link: rescheduleUrl,
-                        reminders_sent: ['confirmed'] // PocketBase JS SDK handles arrays for JSON fields
+                        reminders_sent: [] // Initialize as empty array, background service will handle
                     };
                     // Only add optional fields if they have valid values
                     if (leadId) bookingRecord.lead_id = leadId;
@@ -307,12 +307,14 @@ async function handleTools(toolCalls, phone) {
 Hi ${args.name}, your Strategy Meeting is booked.
 
 📅 *Date:* ${formattedTime}
-🔗 *Meeting Link:* ${videoCallUrl || 'Sent via email'}
+🔗 *Meeting Link:* ${videoCallUrl || 'Coming soon to your calendar'}
 🔄 *Reschedule:* ${rescheduleUrl || 'Check your email'}
 
-I'll send you a few reminders before we start. See you then! 👋`;
+*What’s Next?*
+1. Check your email for the calendar invite.
+2. I will send you reminders 24h, 1h, and 10 mins before we start! 👋`;
                     
-                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_Global';
+                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
                     await sendWhatsAppMessage(phone, confirmationText, instanceName);
                     console.log(`   📱 Confirmation sent to ${phone} using instance ${instanceName}`);
 

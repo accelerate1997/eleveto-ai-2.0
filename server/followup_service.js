@@ -66,7 +66,7 @@ Write a personalized WhatsApp message for Step ${step}.
 
     try {
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "gpt-4o-mini",
             messages: [{ role: "system", content: systemPrompt }],
             temperature: 0.7,
         });
@@ -98,6 +98,17 @@ export async function runFollowupCycle() {
         const INTERVAL_MS = 48 * 60 * 60 * 1000; // 48 Hours
 
         for (const lead of leads) {
+            console.log(`[Follow-up Agent] 🧐 Checking lead: ${lead.name}`);
+            
+            // Check manual follow-up date if set
+            if (lead.followup_date) {
+                const targetDate = new Date(lead.followup_date);
+                if (targetDate > now) {
+                    console.log(`[Follow-up Agent] ⏭️ Skipping ${lead.name} (Scheduled for ${targetDate.toLocaleDateString()})`);
+                    continue;
+                }
+            }
+
             let lastSent = lead.last_followup_sent ? new Date(lead.last_followup_sent) : null;
             
             // If we sent one recently (less than 48 hours ago), skip
@@ -107,7 +118,7 @@ export async function runFollowupCycle() {
                 continue;
             }
 
-            console.log(`[Follow-up Agent] 🚀 Processing Step ${lead.followup_count + 1} for ${lead.name} (${lead.whatsapp})`);
+            console.log(`[Follow-up Agent] 🚀 Generating Step ${lead.followup_count + 1} for ${lead.name}...`);
 
             // 1. Get Conversation History
             const historyRecords = await pb.collection('messages').getList(1, 10, {
@@ -118,16 +129,24 @@ export async function runFollowupCycle() {
                 role: m.role || 'user',
                 content: m.content
             }));
+            console.log(`[Follow-up Agent]    Found ${history.length} previous messages for context.`);
 
             // 2. Generate Message
+            console.log(`[Follow-up Agent]    Calling OpenAI...`);
             const messageText = await generateFollowupMessage(lead, history);
-            if (!messageText) continue;
+            if (!messageText) {
+                console.error(`[Follow-up Agent]    ❌ AI generation failed for ${lead.name}`);
+                continue;
+            }
+            console.log(`[Follow-up Agent]    Message generated: "${messageText.substring(0, 50)}..."`);
 
             // 3. Send via WhatsApp
-            const instanceName = process.env.INSTANCE_NAME || 'Eleveto_Global';
+            const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
+            console.log(`[Follow-up Agent]    Sending via WhatsApp (Instance: ${instanceName})...`);
             const success = await sendWhatsAppMessage(lead.whatsapp, messageText, instanceName);
 
             if (success) {
+                console.log(`[Follow-up Agent]    ✅ Message sent! Updating database...`);
                 // 4. Log the message in the 'messages' collection
                 await pb.collection('messages').create({
                     lead: lead.id,
@@ -137,20 +156,20 @@ export async function runFollowupCycle() {
                 });
 
                 // 5. Update Lead Record
-                const newCount = lead.followup_count + 1;
+                const newCount = (lead.followup_count || 0) + 1;
                 const updateData = {
                     followup_count: newCount,
                     last_followup_sent: now.toISOString()
                 };
                 if (newCount >= 7) {
                     updateData.followup_active = false;
-                    console.log(`[Follow-up Agent] ✅ Completed 7-day sequence for ${lead.name}.`);
+                    console.log(`[Follow-up Agent]    🏁 Completed 7-day sequence for ${lead.name}.`);
                 }
 
                 await pb.collection('leads').update(lead.id, updateData);
-                console.log(`   ✅ Step ${newCount} sent and logged.`);
+                console.log(`[Follow-up Agent]    🎉 Database updated for ${lead.name}.`);
             } else {
-                console.error(`   ❌ Failed to send message to ${lead.whatsapp}`);
+                console.error(`[Follow-up Agent]    ❌ Failed to send WhatsApp message to ${lead.whatsapp}`);
             }
         }
     } catch (err) {
