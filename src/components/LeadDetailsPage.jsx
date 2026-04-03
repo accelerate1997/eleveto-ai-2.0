@@ -102,66 +102,61 @@ export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) 
     );
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--neural-bg)', padding: '1.5rem', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <button 
-                    onClick={onBack}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
-                >
-                    <ArrowLeft size={16} /> Back to Pipeline
-                </button>
-            </div>
-            
-            <div style={{
-                background: 'var(--surface-white)', borderRadius: '24px', width: '100%', maxWidth: '800px', margin: '0 auto', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.1)', border: '1px solid var(--glass-border)', flexShrink: 0
-            }}>
-                {/* Header */}
-                <div style={{ padding: '1.5rem 1.75rem 1.25rem', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366f1, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '1rem', flexShrink: 0 }}>
-                                {(lead.name || 'U')[0].toUpperCase()}
-                            </div>
-                            <div>
-                                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, lineHeight: 1.2, color: 'var(--text-primary)' }}>{lead.name}</h2>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-indigo)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-                                    {lead.status || 'Lead'}
-                                </span>
-                            </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--surface-white)', overflowY: 'auto' }}>
+            {/* Header */}
+            <div style={{ padding: '1.5rem 2.5rem', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: 'var(--surface-white)', zIndex: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    <button 
+                        onClick={onBack}
+                        style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--neural-bg)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: '#64748b', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0 }}
+                        title="Back to Pipeline"
+                    >
+                        <ArrowLeft size={18} />
+                    </button>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, #6366f1, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '1.3rem', flexShrink: 0, boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                            {(lead.name || 'U')[0].toUpperCase()}
                         </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        {!isEditing && (
-                            <button onClick={() => setIsEditing(true)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.45rem 0.875rem', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: '10px', color: 'var(--primary-indigo)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                                <Edit2 size={13} /> Edit
-                            </button>
-                        )}
-                        <button onClick={handleDelete} disabled={isDeleting} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.45rem 0.875rem', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', color: '#ef4444', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                            {isDeleting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} Delete
-                        </button>
-                        <button onClick={onBack} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}>
-                            <X size={16} />
-                        </button>
+                        <div>
+                            <h2 style={{ margin: '0 0 4px 0', fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2, color: 'var(--text-primary)' }}>{lead.name}</h2>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-indigo)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
+                                {lead.status || 'Lead'}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    {!isEditing && (
+                        <button onClick={() => setIsEditing(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1.2rem', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: '10px', color: 'var(--primary-indigo)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            <Edit2 size={14} /> Edit Lead
+                        </button>
+                    )}
+                    <button onClick={handleDelete} disabled={isDeleting} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1.2rem', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', color: '#ef4444', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+                        {isDeleting ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={14} />} Delete
+                    </button>
+                </div>
+            </div>
+
                 {/* Tabs */}
-                <div style={{ display: 'flex', gap: '1.5rem', padding: '0 1.75rem', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', gap: '2rem', padding: '0 2.5rem', borderBottom: '1px solid rgba(0,0,0,0.05)', background: 'var(--surface-white)' }}>
                     {['details', 'conversation'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             style={{
-                                padding: '1rem 0.25rem',
+                                padding: '1rem 0.5rem',
                                 background: 'none',
                                 border: 'none',
                                 borderBottom: activeTab === tab ? '2px solid var(--primary-indigo)' : '2px solid transparent',
                                 color: activeTab === tab ? 'var(--primary-indigo)' : '#64748b',
                                 fontWeight: 700,
-                                fontSize: '0.85rem',
+                                fontSize: '0.9rem',
                                 textTransform: 'capitalize',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                marginBottom: '-1px'
                             }}
                         >
                             {tab}
@@ -169,8 +164,8 @@ export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) 
                     ))}
                 </div>
 
-                {/* Body */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 1.75rem' }}>
+                {/* Body Content */}
+                <div style={{ flex: 1, padding: '2rem 2.5rem', maxWidth: '1000px', width: '100%' }}>
                     {activeTab === 'details' ? (
                         isEditing ? (
                             <div style={{ paddingTop: '0.75rem' }}>
@@ -288,17 +283,16 @@ export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) 
 
                 {/* Footer - Edit mode only */}
                 {isEditing && (
-                    <div style={{ padding: '1rem 1.75rem', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                        <button onClick={() => setIsEditing(false)} style={{ padding: '0.6rem 1.25rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', color: '#94a3b8', fontFamily: 'Inter, sans-serif' }}>
-                            Cancel
-                        </button>
-                        <button onClick={handleSave} disabled={isSaving} className="btn" style={{ width: 'auto', padding: '0.6rem 1.5rem', fontSize: '0.875rem' }}>
-                            {isSaving ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={15} />}
+                    <div style={{ padding: '1.5rem 2.5rem', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: '1rem', justifyContent: 'flex-start', background: 'var(--surface-white)', position: 'sticky', bottom: 0 }}>
+                        <button onClick={handleSave} disabled={isSaving} className="btn" style={{ width: 'auto', padding: '0.75rem 2rem', fontSize: '0.95rem' }}>
+                            {isSaving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
                             Save Changes
+                        </button>
+                        <button onClick={() => setIsEditing(false)} style={{ padding: '0.75rem 1.5rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer', color: '#64748b', fontFamily: 'Inter, sans-serif' }}>
+                            Cancel
                         </button>
                     </div>
                 )}
-            </div>
         </div>
     );
 }
