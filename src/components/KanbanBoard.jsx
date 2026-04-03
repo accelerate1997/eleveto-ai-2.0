@@ -15,7 +15,7 @@ const COLUMNS = [
     'Non Converted'
 ];
 
-export default function KanbanBoard() {
+export default function KanbanBoard({ onViewLead }) {
     const [leads, setLeads] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -129,6 +129,7 @@ export default function KanbanBoard() {
                                                 key={lead.id}
                                                 lead={lead}
                                                 index={index}
+                                                onViewLead={onViewLead}
                                                 onUpdated={(updated) => setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))}
                                                 onDeleted={(id) => setLeads(prev => prev.filter(l => l.id !== id))}
                                             />

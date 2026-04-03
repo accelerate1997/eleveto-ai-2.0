@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { MapPin, MessageSquare, Linkedin, Globe, ChevronDown, Loader2, Phone, TrendingUp, Briefcase } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
-import LeadDetailModal from './LeadDetailModal';
-
 const STATUSES = [
     'Lead',
     'Qualified',
@@ -24,8 +22,7 @@ const STATUS_COLORS = {
     'Non Converted': { bg: 'rgba(225, 29, 72, 0.05)', color: '#e11d48', border: 'rgba(225, 29, 72, 0.1)' },
 };
 
-export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
-    const [showModal, setShowModal] = useState(false);
+export default function LeadCard({ lead, index, onViewLead, onUpdated, onDeleted }) {
     const [isChanging, setIsChanging] = useState(false);
     const [currentStatus, setCurrentStatus] = useState(lead.status || 'Lead');
     const [followupDate, setFollowupDate] = useState(lead.followup_date ? lead.followup_date.split(' ')[0] : '');
@@ -72,7 +69,9 @@ export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
-                        onClick={() => !snapshot.isDragging && setShowModal(true)}
+                        onClick={() => {
+                            if (!snapshot.isDragging) onViewLead({ ...lead, status: currentStatus });
+                        }}
                         style={{
                             ...provided.draggableProps.style,
                             marginBottom: '8px',
@@ -171,7 +170,10 @@ export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
                                             📅 Follow-up Date
                                         </div>
                                         <div style={{ fontSize: '0.62rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.1)', padding: '1px 5px', borderRadius: '4px', color: '#d97706' }}>
-                                            Sequence: {lead.followup_count || 0}/7
+                                            {lead.expand?.sequence 
+                                                ? `${lead.expand.sequence.name}: ${lead.followup_count || 0}/${lead.expand.sequence.steps?.length || 0}`
+                                                : `AI Steps: ${lead.followup_count || 0}/7`
+                                            }
                                         </div>
                                     </div>
                                     <div style={{ position: 'relative' }}>
@@ -228,18 +230,7 @@ export default function LeadCard({ lead, index, onUpdated, onDeleted }) {
                         </div>
                     </div>
 
-                    {showModal && (
-                        <LeadDetailModal
-                            lead={{ ...lead, status: currentStatus }}
-                            onClose={() => setShowModal(false)}
-                            onUpdated={(updated) => {
-                                setCurrentStatus(updated.status || currentStatus);
-                                onUpdated?.(updated);
-                                setShowModal(false);
-                            }}
-                            onDeleted={(id) => { onDeleted?.(id); }}
-                        />
-                    )}
+
                 </>
             )}
         </Draggable>

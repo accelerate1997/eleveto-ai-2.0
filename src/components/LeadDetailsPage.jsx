@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import ReactDOM from 'react-dom';
 import { pb } from '../lib/pocketbase';
-import { X, Mail, Phone, Linkedin, Globe, MapPin, Edit2, Trash2, Loader2, ExternalLink, Save, Calendar, TrendingUp, Briefcase } from 'lucide-react';
+import { X, Mail, Phone, Linkedin, Globe, MapPin, Edit2, Trash2, Loader2, ExternalLink, Save, Calendar, TrendingUp, Briefcase, ArrowLeft } from 'lucide-react';
 
-export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted }) {
+export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) {
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('details'); // 'details' | 'conversation'
     const [messages, setMessages] = useState([]);
+    const [sequences, setSequences] = useState([]);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [form, setForm] = useState({
         name: lead.name || '',
@@ -20,7 +20,21 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
         industry: lead.industry || '',
         investment: lead.investment || '',
         followup_date: lead.followup_date ? lead.followup_date.split(' ')[0] : '',
+        sequence: lead.sequence || '',
     });
+
+    const fetchSequences = async () => {
+        try {
+            const records = await pb.collection('sequences').getFullList();
+            setSequences(records);
+        } catch (err) {
+            console.error('Failed to fetch sequences:', err);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchSequences();
+    }, []);
 
     const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -42,7 +56,7 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
         try {
             await pb.collection('leads').delete(lead.id);
             onDeleted(lead.id);
-            onClose();
+            onBack();
         } catch (err) {
             alert('Delete failed: ' + err.message);
             setIsDeleting(false);
@@ -87,15 +101,20 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
         </div>
     );
 
-    return ReactDOM.createPortal(
-        <div
-            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1.5rem' }}
-            onClick={onClose}
-        >
-            <div
-                style={{ background: 'var(--surface-white)', borderRadius: '24px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 40px 80px -20px rgba(0, 0, 0, 0.2)', border: '1px solid var(--glass-border)' }}
-                onClick={e => e.stopPropagation()}
-            >
+    return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--neural-bg)', padding: '1.5rem', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <button 
+                    onClick={onBack}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
+                >
+                    <ArrowLeft size={16} /> Back to Pipeline
+                </button>
+            </div>
+            
+            <div style={{
+                background: 'var(--surface-white)', borderRadius: '24px', width: '100%', maxWidth: '800px', margin: '0 auto', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.1)', border: '1px solid var(--glass-border)', flexShrink: 0
+            }}>
                 {/* Header */}
                 <div style={{ padding: '1.5rem 1.75rem 1.25rem', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
                     <div>
@@ -120,7 +139,7 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                         <button onClick={handleDelete} disabled={isDeleting} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.45rem 0.875rem', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', color: '#ef4444', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                             {isDeleting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} Delete
                         </button>
-                        <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}>
+                        <button onClick={onBack} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}>
                             <X size={16} />
                         </button>
                     </div>
@@ -173,6 +192,24 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                                         <input id={`edit-${field.name}`} name={field.name} type={field.type} value={form[field.name]} onChange={handleChange} />
                                     </div>
                                 ))}
+
+                                {(lead.status === 'Follow Up' || form.status === 'Follow Up') && (
+                                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                        <label htmlFor="edit-sequence">🤖 Follow-up Sequence</label>
+                                        <select 
+                                            id="edit-sequence" 
+                                            name="sequence" 
+                                            value={form.sequence} 
+                                            onChange={handleChange}
+                                            style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.1)', outline: 'none' }}
+                                        >
+                                            <option value="">Default AI Logic</option>
+                                            {sequences.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div style={{ paddingTop: '0.25rem' }}>
@@ -183,8 +220,11 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                                 <InfoRow icon={Globe} label="Google Maps" value={lead.google ? 'View on Maps' : null} href={lead.google || null} />
                                 <InfoRow icon={Briefcase} label="Industry" value={lead.industry} />
                                 <InfoRow icon={TrendingUp} label="Investment" value={lead.investment} />
-                                {lead.status === 'Follow Up' && (
-                                    <InfoRow icon={Calendar} label="Follow-up Date" value={lead.followup_date ? new Date(lead.followup_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'} />
+                                {(lead.status === 'Follow Up') && (
+                                    <>
+                                        <InfoRow icon={Calendar} label="Follow-up Date" value={lead.followup_date ? new Date(lead.followup_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'} />
+                                        <InfoRow icon={Zap} label="Assigned Sequence" value={lead.expand?.sequence?.name || 'Default AI Logic'} />
+                                    </>
                                 )}
                                 <div style={{ padding: '0.75rem 0', fontSize: '0.75rem', color: '#64748b', borderTop: '1px solid rgba(255, 255, 255, 0.05)', marginTop: '0.5rem' }}>
                                     <div style={{ marginBottom: '4px' }}>
@@ -260,5 +300,5 @@ export default function LeadDetailModal({ lead, onClose, onUpdated, onDeleted })
                 )}
             </div>
         </div>
-        , document.body);
+    );
 }

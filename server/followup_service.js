@@ -78,6 +78,41 @@ Write a personalized WhatsApp message for Step ${step}.
 }
 
 /**
+ * Generate an AI message based on a sequence step directive.
+ */
+async function generateSequenceStepMessage(lead, stepContent, history) {
+    const systemPrompt = `You are Aria, a friendly AI assistant for Eleveto AI. 
+You are following up with a lead via WhatsApp as part of a custom sequence.
+
+Directive for this message: ${stepContent}
+
+Lead Name: ${lead.name}
+Lead Interest: ${lead.interest || lead.notes || 'AI Automation'}
+
+[CONVERSATION HISTORY]
+${history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')}
+
+[TASK]
+Write a personalized WhatsApp message following the directive above.
+- Be friendly, professional, and concise.
+- Max 2 sentences.
+- Do NOT use formal letters or subjects. Just the message text.
+- NEVER use the word 'budget'. Use 'Investment' if needed.`;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "system", content: systemPrompt }],
+            temperature: 0.7,
+        });
+        return completion.choices[0].message.content.trim();
+    } catch (err) {
+        console.error(`[Follow-up Agent] Sequence Step AI Error:`, err.message);
+        return null;
+    }
+}
+
+/**
  * Main logic to check and send follow-ups.
  */
 export async function runFollowupCycle() {
@@ -86,9 +121,9 @@ export async function runFollowupCycle() {
     try {
         await ensureAuth();
         
-        // Find leads in 'Follow Up' status who are active and haven't finished the 7 steps
+        // Find leads in 'Follow Up' status who are active and haven't finished the sequence
         const leads = await pb.collection('leads').getFullList({
-            filter: 'status="Follow Up" && followup_active=true && followup_count < 7',
+            filter: 'status="Follow Up" && followup_active=true',
             sort: '-created'
         });
 
@@ -130,15 +165,61 @@ export async function runFollowupCycle() {
                 content: m.content
             }));
             console.log(`[Follow-up Agent]    Found ${history.length} previous messages for context.`);
+            
+            let messageText = null;
+            let sequenceFinished = false;
 
-            // 2. Generate Message
-            console.log(`[Follow-up Agent]    Calling OpenAI...`);
-            const messageText = await generateFollowupMessage(lead, history);
-            if (!messageText) {
-                console.error(`[Follow-up Agent]    ❌ AI generation failed for ${lead.name}`);
+            // 2. Logic Selection: Manual > Sequence > Default AI
+            if (lead.custom_followup) {
+                console.log(`[Follow-up Agent]    📝 Using manual personalized message...`);
+                messageText = lead.custom_followup;
+            } else if (lead.sequence) {
+                try {
+                    const seq = await pb.collection('sequences').getOne(lead.sequence);
+                    const nextStepIndex = lead.followup_count || 0;
+                    const step = seq.steps?.[nextStepIndex];
+
+                    if (step) {
+                        console.log(`[Follow-up Agent]    ⚡ Using Sequence Step ${nextStepIndex + 1}: ${step.mode}`);
+                        if (step.mode === 'fixed') {
+                            messageText = step.content;
+                        } else {
+                            messageText = await generateSequenceStepMessage(lead, step.content, history);
+                        }
+                        
+                        if (nextStepIndex + 1 >= seq.steps.length) {
+                            sequenceFinished = true;
+                        }
+                    } else {
+                        console.log(`[Follow-up Agent]    🏁 Sequence exhausted for ${lead.name}.`);
+                        sequenceFinished = true;
+                    }
+                } catch (e) {
+                    console.error(`[Follow-up Agent]    ❌ Failed to fetch sequence ${lead.sequence}:`, e.message);
+                }
+            } else {
+                // Fallback: Old 7-day AI logic
+                if (lead.followup_count >= 7) {
+                    console.log(`[Follow-up Agent]    🏁 Default 7-day sequence finished for ${lead.name}.`);
+                    sequenceFinished = true;
+                } else {
+                    console.log(`[Follow-up Agent]    🤖 Using Default AI Generation...`);
+                    messageText = await generateFollowupMessage(lead, history);
+                }
+            }
+
+            if (!messageText && !sequenceFinished) {
+                console.error(`[Follow-up Agent]    ❌ Failed to determine message for ${lead.name}`);
                 continue;
             }
-            console.log(`[Follow-up Agent]    Message generated: "${messageText.substring(0, 50)}..."`);
+
+            if (sequenceFinished) {
+                await pb.collection('leads').update(lead.id, { followup_active: false });
+                console.log(`[Follow-up Agent]    🏁 Marking ${lead.name} as finished (followup_active=false).`);
+                continue;
+            }
+
+            console.log(`[Follow-up Agent]    Message determined: "${messageText.substring(0, 50)}..."`);
 
             // 3. Send via WhatsApp
             const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
@@ -156,14 +237,14 @@ export async function runFollowupCycle() {
                 });
 
                 // 5. Update Lead Record
-                const newCount = (lead.followup_count || 0) + 1;
                 const updateData = {
-                    followup_count: newCount,
-                    last_followup_sent: now.toISOString()
+                    followup_count: (lead.followup_count || 0) + 1,
+                    last_followup_sent: now.toISOString(),
+                    custom_followup: '' // Clear manual override if it was used
                 };
-                if (newCount >= 7) {
+                
+                if (sequenceFinished) {
                     updateData.followup_active = false;
-                    console.log(`[Follow-up Agent]    🏁 Completed 7-day sequence for ${lead.name}.`);
                 }
 
                 await pb.collection('leads').update(lead.id, updateData);

@@ -635,8 +635,13 @@ app.post('/webhook', async (req, res) => {
  */
 app.post('/api/webhooks/cal', async (req, res) => {
     try {
+        console.log('\n📥 [Cal Webhook] Incoming Request:');
+        console.log('   Headers:', JSON.stringify(req.headers, null, 2));
+        console.log('   Body Size:', JSON.stringify(req.body).length);
+        console.log('   Raw Body:', JSON.stringify(req.body, null, 2));
+        
         const payload = req.body.payload || req.body;
-        const trigger = req.body.triggerEvent || 'BOOKING_CREATED';
+        const trigger = req.body.triggerEvent || payload.triggerEvent || 'BOOKING_CREATED';
 
         console.log(`\n📅 [Cal Webhook] Trigger: ${trigger}`);
 
@@ -644,15 +649,21 @@ app.post('/api/webhooks/cal', async (req, res) => {
             return res.status(200).json({ message: 'Ignore non-creation events for now' });
         }
 
-        const attendee = payload.attendees?.[0] || payload.responses || {};
-        const name = attendee.name || 'Guest';
-        const email = attendee.email || '';
-        const phone = attendee.phoneNumber || attendee.attendeePhoneNumber || '';
-        const startTime = payload.startTime || payload.start;
-        const videoUrl = payload.videoCallUrl || payload.metadata?.videoCallUrl || '';
+        // Cal.com payloads can vary. Let's try multiple common locations for attendee info.
+        const attendees = payload.attendees || payload.payload?.attendees || [];
+        const responses = payload.responses || {};
+        
+        const attendee = attendees[0] || {};
+        const name = attendee.name || responses.name?.value || payload.name || 'Guest';
+        const email = attendee.email || responses.email?.value || payload.email || '';
+        const phone = attendee.phoneNumber || attendee.attendeePhoneNumber || responses.phone?.value || '';
+
+        const startTime = payload.startTime || payload.start || payload.payload?.startTime;
+        const videoUrl = payload.videoCallUrl || payload.metadata?.videoCallUrl || payload.payload?.videoCallUrl || '';
 
         if (!phone) {
-            console.log('[Cal Webhook] No phone number found in payload, skipping WA.');
+            console.log('[Cal Webhook] No phone number found in payload. Fields checked: attendee.phoneNumber, attendee.attendeePhoneNumber, responses.phone.value');
+            console.log('   Full Body checked:', JSON.stringify(req.body, null, 2));
             return res.status(200).json({ success: false, message: 'No phone number' });
         }
 

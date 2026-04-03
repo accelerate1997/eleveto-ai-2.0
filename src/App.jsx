@@ -9,7 +9,9 @@ import BookingManagement from './components/BookingManagement';
 import Integrations from './components/Integrations';
 import EmployeesManager from './components/EmployeesManager';
 import PortfolioManagement from './components/PortfolioManagement';
-import { Kanban, Zap, Users, LogOut, ChevronRight, Boxes, Activity, Menu, X, Calendar, Plug, ShieldCheck, Briefcase } from 'lucide-react';
+import SequenceBuilder from './components/SequenceBuilder';
+import LeadDetailsPage from './components/LeadDetailsPage';
+import { Kanban, Zap, Users, LogOut, ChevronRight, Boxes, Activity, Menu, X, Calendar, Plug, ShieldCheck, Briefcase, ListOrdered } from 'lucide-react';
 
 const NAV_ITEMS = [
   {
@@ -73,6 +75,14 @@ const NAV_ITEMS = [
     description: 'Manage agency projects',
     color: '#3b82f6',
   },
+  {
+    id: 'sequences',
+    view: 'sequences',
+    label: 'Sequence Builder',
+    icon: ListOrdered,
+    description: 'Automated workflows',
+    color: '#8b5cf6',
+  },
 ];
 
 function App() {
@@ -80,6 +90,7 @@ function App() {
   const [view, setView] = useState('kanban');
   const [leadGenTab, setLeadGenTab] = useState('scraper');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
 
   useEffect(() => {
     return pb.authStore.onChange((token, model) => {
@@ -443,14 +454,16 @@ function App() {
           </div>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {view === 'kanban' && <KanbanBoard user={user} onLogout={handleLogout} />}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {view === 'kanban' && <KanbanBoard user={user} onLogout={handleLogout} onViewLead={(lead) => { setSelectedLead(lead); setView('leadDetails'); }} />}
+          {view === 'leadDetails' && <LeadDetailsPage lead={selectedLead} onBack={() => { setView('kanban'); setSelectedLead(null); }} onUpdated={(updated) => setSelectedLead(updated)} onDeleted={() => { setView('kanban'); setSelectedLead(null); }} />}
           {view === 'leadgen' && <LeadGeneration defaultTab={leadGenTab} />}
           {view === 'clients' && <ClientManagement />}
           {view === 'bookings' && <BookingManagement />}
           {view === 'integrations' && <Integrations />}
           {view === 'employees' && <EmployeesManager currentUser={user} />}
           {view === 'portfolio' && <PortfolioManagement />}
+          {view === 'sequences' && <SequenceBuilder />}
         </div>
       </main>
     </div>

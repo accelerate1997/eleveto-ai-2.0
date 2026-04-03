@@ -26,7 +26,9 @@ async function updateSchema() {
         const fieldsToAdd = [
             { name: 'followup_count', type: 'number', options: { min: 0 } },
             { name: 'last_followup_sent', type: 'date' },
-            { name: 'followup_active', type: 'bool', options: {} }
+            { name: 'followup_active', type: 'bool', options: {} },
+            { name: 'custom_followup', type: 'text' },
+            { name: 'sequence', type: 'relation', options: { maxSelect: 1, collectionId: 'sequences', cascadeDelete: false } }
         ];
 
         let schemaChanged = false;
