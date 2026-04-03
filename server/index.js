@@ -10,7 +10,8 @@ import {
     sendWhatsAppMessage,
     isDuplicate,
     clearAriaSession,
-    getAriaSessionCount
+    getAriaSessionCount,
+    syncLead
 } from './aria_service.js';
 import { checkAndSendReminders, startReminderService } from './reminder_service.js';
 import { startFollowupService } from './followup_service.js';
@@ -623,6 +624,74 @@ app.post('/webhook', async (req, res) => {
     } catch (error) {
         console.error('[Aria Webhook Error]:', error);
         if (!res.headersSent) res.sendStatus(500);
+    }
+});
+
+/**
+ * ─────────────────────────────────────────────────
+ *  CAL.COM — Booking Webhook
+ *  POST /api/webhooks/cal
+ * ─────────────────────────────────────────────────
+ */
+app.post('/api/webhooks/cal', async (req, res) => {
+    try {
+        const payload = req.body.payload || req.body;
+        const trigger = req.body.triggerEvent || 'BOOKING_CREATED';
+
+        console.log(`\n📅 [Cal Webhook] Trigger: ${trigger}`);
+
+        if (trigger !== 'BOOKING_CREATED') {
+            return res.status(200).json({ message: 'Ignore non-creation events for now' });
+        }
+
+        const attendee = payload.attendees?.[0] || payload.responses || {};
+        const name = attendee.name || 'Guest';
+        const email = attendee.email || '';
+        const phone = attendee.phoneNumber || attendee.attendeePhoneNumber || '';
+        const startTime = payload.startTime || payload.start;
+        const videoUrl = payload.videoCallUrl || payload.metadata?.videoCallUrl || '';
+
+        if (!phone) {
+            console.log('[Cal Webhook] No phone number found in payload, skipping WA.');
+            return res.status(200).json({ success: false, message: 'No phone number' });
+        }
+
+        console.log(`   👤 Attendee: ${name} (${phone})`);
+        console.log(`   ⏰ Time: ${startTime}`);
+
+        // 1. Sync Lead to PocketBase with status 'Meeting Booked'
+        await syncLead(phone, { name, email, interest: 'Meeting Booked via Cal.com' }, 'Meeting Booked');
+
+        // 2. Trigger a full sync of bookings to ensure the record exists in PB 'bookings'
+        // We do this after a small delay to allow Cal.com to finalize if needed
+        setTimeout(() => {
+            syncCalBookings().catch(err => console.error('[Webhook Sync] Auto-sync failed:', err.message));
+        }, 2000);
+
+        // 3. Send WhatsApp Confirmation
+        const formattedTime = new Date(startTime).toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            dateStyle: 'full',
+            timeStyle: 'short'
+        });
+
+        const confirmationText = `✅ *Meeting Confirmed!*
+
+Hi *${name}*, your Strategy Meeting with *Eleveto AI* is officially booked.
+
+📅 *Time:* ${formattedTime} (IST)
+🔗 *Meeting Link:* ${videoUrl || 'Check your email invite'}
+
+We look forward to seeing you there! 👋`;
+
+        const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
+        await sendWhatsAppMessage(phone, confirmationText, instanceName);
+
+        res.json({ success: true, message: 'Lead synced and confirmation sent' });
+
+    } catch (error) {
+        console.error('[Cal Webhook Error]:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

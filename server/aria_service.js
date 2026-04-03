@@ -130,6 +130,66 @@ const tools = [
 ];
 
 /**
+ * Synchronize a lead with the PocketBase CRM.
+ */
+export async function syncLead(phone, args, status = 'Qualified') {
+    try {
+        console.log(`\n🔄 [CRM Sync] Processing lead for ${phone} (Status: ${status})`);
+        
+        // 1. Authenticate as admin
+        await ensureAuth();
+
+        // 2. Normalize data for sync
+        const normalizedPhone = phone.replace('+', '').replace('@s.whatsapp.net', '');
+
+        // 3. Search for existing lead (by phone)
+        let existingRecord = null;
+        try {
+            existingRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${normalizedPhone}"`);
+        } catch (findErr) {
+            if (findErr.status !== 404) throw findErr;
+        }
+
+        let record;
+        if (existingRecord) {
+            console.log(`   🔄 Existing lead found: ${existingRecord.id}. Updating...`);
+            const updateData = { status };
+            if (args.name && args.name.trim() !== '') updateData.name = args.name;
+            if (args.email && args.email.trim() !== '') updateData.email = args.email;
+            if (args.country) updateData.country = args.country;
+            if (args.investment) updateData.investment = args.investment;
+            if (args.interest) updateData.interest = args.interest;
+            if (args.notes) updateData.notes = args.notes;
+            if (args.industry) updateData.industry = args.industry;
+            
+            record = await pb.collection('leads').update(existingRecord.id, updateData);
+            console.log(`   ✅ Lead updated: ${record.id}`);
+        } else {
+            console.log(`   🆕 No existing lead for ${normalizedPhone}. Creating new...`);
+            const leadData = {
+                whatsapp: normalizedPhone,
+                name: args.name || `Lead ${normalizedPhone.slice(-4)}`,
+                email: args.email || '',
+                notes: args.notes || `Interest: ${args.interest || 'N/A'}\nInvestment: ${args.investment || 'Not shared'}\nLocation: ${args.country || 'Not shared'}\nContext: ${args.notes || 'None'}`,
+                status: status,
+                source: 'WhatsApp Assistant'
+            };
+            if (args.industry) leadData.industry = args.industry;
+            if (args.interest) leadData.interest = args.interest;
+            if (args.investment) leadData.investment = args.investment;
+            if (args.country) leadData.country = args.country;
+
+            record = await pb.collection('leads').create(leadData);
+            console.log(`   ✅ New lead created: ${record.id}`);
+        }
+        return record;
+    } catch (err) {
+        console.error(`   ❌ Sync Lead Error:`, err.message);
+        throw err;
+    }
+}
+
+/**
  * Handle tool calls from OpenAI.
  */
 async function handleTools(toolCalls, phone) {
@@ -138,62 +198,15 @@ async function handleTools(toolCalls, phone) {
         if (toolCall.function.name === 'save_lead') {
             try {
                 const args = JSON.parse(toolCall.function.arguments);
-                console.log(`\n📝 [Aria Tool] Calling save_lead for ${phone}`);
-                console.log(`   Data:`, JSON.stringify(args, null, 2));
-
-                // 1. Authenticate as admin before database operation
-                await ensureAuth();
-
-                // 2. Check if lead already exists (by phone)
-                let existingRecord = null;
-                try {
-                    existingRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
-                } catch (findErr) {
-                    if (findErr.status !== 404) {
-                        // A real error (auth, network) — rethrow so it's properly caught
-                        throw findErr;
-                    }
-                    // 404 = not found, we'll create below
-                }
-
-                let record;
-                if (existingRecord) {
-                    console.log(`   🔄 Existing lead found: ${existingRecord.id}. Updating...`);
-                    const updateData = { status: 'Qualified' };
-                    if (args.name && args.name.trim() !== '') updateData.name = args.name;
-                    if (args.country) updateData.country = args.country;
-                    if (args.investment) updateData.investment = args.investment;
-                    if (args.interest) updateData.interest = args.interest;
-                    if (args.notes) updateData.notes = args.notes;
-                    if (args.industry) updateData.industry = args.industry;
-                    record = await pb.collection('leads').update(existingRecord.id, updateData);
-                    console.log(`   ✅ Lead updated: ${record.id}`);
-                } else {
-                    console.log(`   🆕 No existing lead for ${phone}. Creating new...`);
-                    await ensureAuth();
-                    const leadData = {
-                        whatsapp: phone,
-                        name: args.name || `Lead ${phone.slice(-4)}`,
-                        notes: `Interest: ${args.interest}\nInvestment: ${args.investment || 'Not shared'}\nLocation: ${args.country || 'Not shared'}\nContext: ${args.notes || 'None'}`,
-                        status: 'Qualified',
-                        source: 'WhatsApp AI'
-                    };
-
-                    if (args.industry) leadData.industry = args.industry;
-                    record = await pb.collection('leads').create(leadData);
-                    console.log(`   ✅ New lead created: ${record.id}`);
-                }
-
+                const record = await syncLead(phone, args, 'Qualified');
+                
                 results.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
                     name: "save_lead",
-                    content: "SUCCESS: The lead was registered in the CRM. You can now invite them to the Strategy Meeting."
+                    content: `SUCCESS: Lead ${record.name} was registered in the CRM. You can now invite them to the Strategy Meeting.`
                 });
             } catch (err) {
-                console.error(`   ❌ Tool Error:`, err.message);
-                if (err.data) console.error('   Data:', JSON.stringify(err.data));
-
                 results.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
