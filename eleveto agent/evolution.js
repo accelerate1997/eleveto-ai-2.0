@@ -24,6 +24,10 @@ async function sendMessage(remoteJid, text, instanceName) {
         // Assuming ~60ms per character to be realistic (min 5s, max 15s delay)
         const typingDelay = Math.max(5000, Math.min(15000, text.length * 60));
 
+        // FORCE Node.js to actually wait for this amount of time before even sending the request to Evolution API.
+        // This guarantees the delay happens even if the API server ignores the delay parameter.
+        await new Promise(resolve => setTimeout(resolve, typingDelay));
+
         const response = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: {
