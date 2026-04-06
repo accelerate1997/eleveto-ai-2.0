@@ -20,9 +20,9 @@ async function sendMessage(remoteJid, text, instanceName) {
         const cleanNumber = remoteJid.replace('+', '').replace('@s.whatsapp.net', '');
         console.log(`📡 Sending message to ${cleanNumber} via instance ${instanceName}...`);
 
-        // Calculate dynamic delay to simulate human typing (approx 20-30ms per char)
-        // Minimum delay 3 seconds, maximum 10 seconds.
-        const typingDelay = Math.max(3000, Math.min(10000, text.length * 30));
+        // Calculate dynamic delay to simulate human typing
+        // Assuming ~60ms per character to be realistic (min 5s, max 15s delay)
+        const typingDelay = Math.max(5000, Math.min(15000, text.length * 60));
 
         const response = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',

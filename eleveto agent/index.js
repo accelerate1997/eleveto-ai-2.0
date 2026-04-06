@@ -98,6 +98,11 @@ app.post('/webhook', async (req, res) => {
         recentWebhooks.unshift({ time: new Date().toISOString(), phone, text: text.substring(0, 60) });
         if (recentWebhooks.length > 10) recentWebhooks.pop();
 
+        // Add an artificial "reading" delay before we even process it
+        // A human takes a few seconds just to read the notification and open the app
+        const readDelay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000; // 2s to 4s
+        await new Promise(resolve => setTimeout(resolve, readDelay));
+
         // Get AI response and send it
         const reply = await processMessage(text, phone);
         console.log(`💬 Reply to ${phone}: ${reply.substring(0, 80)}...`);
