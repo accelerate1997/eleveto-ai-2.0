@@ -20,6 +20,10 @@ async function sendMessage(remoteJid, text, instanceName) {
         const cleanNumber = remoteJid.replace('+', '').replace('@s.whatsapp.net', '');
         console.log(`📡 Sending message to ${cleanNumber} via instance ${instanceName}...`);
 
+        // Calculate dynamic delay to simulate human typing (approx 20-30ms per char)
+        // Minimum delay 3 seconds, maximum 10 seconds.
+        const typingDelay = Math.max(3000, Math.min(10000, text.length * 30));
+
         const response = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: {
@@ -29,7 +33,7 @@ async function sendMessage(remoteJid, text, instanceName) {
             body: JSON.stringify({
                 number: cleanNumber,
                 options: {
-                    delay: 1200,
+                    delay: typingDelay,
                     presence: "composing",
                     linkPreview: false
                 },
