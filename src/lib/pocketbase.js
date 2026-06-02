@@ -197,6 +197,24 @@ export const pb = {
                 return await request(`/api/${colName}/${id}`);
             },
 
+            getFirstListItem: async (filter, queryOptions = {}) => {
+                const list = await pb.collection(colName).getFullList(queryOptions);
+                const match = filter.match(/^\s*([a-zA-Z0-9_]+)\s*(?:=|\~)\s*["']([^"']+)["']\s*$/);
+                if (match) {
+                    const key = match[1];
+                    const val = match[2];
+                    const found = list.find(item => {
+                        const itemVal = item[key];
+                        if (itemVal === undefined || itemVal === null) return false;
+                        return String(itemVal).toLowerCase().trim() === String(val).toLowerCase().trim();
+                    });
+                    if (found) return found;
+                }
+                const error = new Error('The requested resource was not found.');
+                error.status = 404;
+                throw error;
+            },
+
             create: async (data) => {
                 let body;
                 if (data instanceof FormData) {
