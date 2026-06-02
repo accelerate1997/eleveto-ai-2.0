@@ -9,6 +9,8 @@ const DDL_STATEMENTS = [
         name TEXT,
         role TEXT DEFAULT 'employee', -- 'owner', 'employee'
         active BOOLEAN DEFAULT TRUE,
+        cal_api_key TEXT,
+        cal_username TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );`,
 

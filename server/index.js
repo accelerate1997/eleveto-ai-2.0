@@ -617,8 +617,60 @@ app.delete('/api/invites/:id', authenticateToken, async (req, res) => {
 // GET /api/users
 app.get('/api/users', authenticateToken, async (req, res) => {
     try {
-        const queryRes = await pool.query('SELECT id, email, name, role, created_at FROM public.users ORDER BY name ASC');
+        const queryRes = await pool.query('SELECT id, email, name, role, active, cal_api_key, cal_username, created_at FROM public.users ORDER BY name ASC');
         res.json(queryRes.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/users/:id
+app.get('/api/users/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const queryRes = await pool.query('SELECT id, email, name, role, active, cal_api_key, cal_username, created_at FROM public.users WHERE id = $1', [id]);
+        const user = queryRes.rows[0];
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /api/users/:id
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const body = req.body;
+
+    try {
+        const updates = [];
+        const values = [];
+        let index = 1;
+
+        const allowedFields = [
+            'name', 'email', 'role', 'active', 'cal_api_key', 'cal_username'
+        ];
+
+        for (const [key, val] of Object.entries(body)) {
+            if (allowedFields.includes(key)) {
+                updates.push(`${key} = $${index}`);
+                values.push(val);
+                index++;
+            }
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided for update' });
+        }
+
+        values.push(id);
+        const queryStr = `UPDATE public.users SET ${updates.join(', ')} WHERE id = $${index} RETURNING id, email, name, role, active, cal_api_key, cal_username`;
+        
+        const queryRes = await pool.query(queryStr, values);
+        const updatedUser = queryRes.rows[0];
+
+        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+        res.json(updatedUser);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
