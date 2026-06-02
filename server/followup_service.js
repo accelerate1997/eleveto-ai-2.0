@@ -1,32 +1,15 @@
-import PocketBase from 'pocketbase';
+import pool from './db.js';
 import * as dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import OpenAI from 'openai';
 import { sendWhatsAppMessage } from './aria_service.js';
+import { broadcast } from './socket.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../.env') });
 
-const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-async function ensureAuth() {
-    try {
-        if (pb.authStore.isValid) return;
-        const email = process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
-        const password = process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
-        if (!email || !password) return;
-
-        try {
-            await pb.collection('_superusers').authWithPassword(email, password);
-        } catch (e) {
-            await pb.admins.authWithPassword(email, password);
-        }
-    } catch (err) {
-        console.error('[Follow-up Agent] PB Auth Error:', err.message);
-    }
-}
 
 /**
  * Generate a personalized follow-up message using AI.
@@ -117,15 +100,14 @@ Write a personalized WhatsApp message following the directive above.
  */
 export async function runFollowupCycle() {
     console.log(`[Follow-up Agent] 🤖 Cycle started... (${new Date().toLocaleString()})`);
+    const client = await pool.connect();
     
     try {
-        await ensureAuth();
-        
         // Find leads in 'Follow Up' status who are active and haven't finished the sequence
-        const leads = await pb.collection('leads').getFullList({
-            filter: 'status="Follow Up" && followup_active=true',
-            sort: '-created'
-        });
+        const leadsRes = await client.query(
+            'SELECT * FROM public.leads WHERE status = \'Follow Up\' AND followup_active = true ORDER BY created_at DESC'
+        );
+        const leads = leadsRes.rows;
 
         console.log(`[Follow-up Agent] 🔍 Found ${leads.length} active follow-up leads.`);
 
@@ -155,29 +137,31 @@ export async function runFollowupCycle() {
 
             console.log(`[Follow-up Agent] 🚀 Generating Step ${lead.followup_count + 1} for ${lead.name}...`);
 
-            // 1. Get Conversation History
-            const historyRecords = await pb.collection('messages').getList(1, 10, {
-                filter: `lead="${lead.id}"`,
-                sort: '-created'
-            });
-            const history = historyRecords.items.reverse().map(m => ({
-                role: m.role || 'user',
-                content: m.content
-            }));
+            // 1. Get Conversation History (Last 10 messages)
+            const historyRes = await client.query(
+                'SELECT role, content FROM public.messages WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 10',
+                [lead.id]
+            );
+            // Reverse so they are chronological
+            const history = historyRes.rows.reverse();
             console.log(`[Follow-up Agent]    Found ${history.length} previous messages for context.`);
             
             let messageText = null;
             let sequenceFinished = false;
 
             // 2. Logic Selection: Manual > Sequence > Default AI
-            if (lead.custom_followup) {
+            if (lead.custom_followup && lead.custom_followup.trim() !== '') {
                 console.log(`[Follow-up Agent]    📝 Using manual personalized message...`);
                 messageText = lead.custom_followup;
-            } else if (lead.sequence) {
+            } else if (lead.sequence_id) {
                 try {
-                    const seq = await pb.collection('sequences').getOne(lead.sequence);
+                    const seqRes = await client.query('SELECT * FROM public.sequences WHERE id = $1', [lead.sequence_id]);
+                    const seq = seqRes.rows[0];
                     const nextStepIndex = lead.followup_count || 0;
-                    const step = seq.steps?.[nextStepIndex];
+                    
+                    // Parse steps JSONB
+                    const steps = Array.isArray(seq?.steps) ? seq.steps : JSON.parse(seq?.steps || '[]');
+                    const step = steps[nextStepIndex];
 
                     if (step) {
                         console.log(`[Follow-up Agent]    ⚡ Using Sequence Step ${nextStepIndex + 1}: ${step.mode}`);
@@ -187,7 +171,7 @@ export async function runFollowupCycle() {
                             messageText = await generateSequenceStepMessage(lead, step.content, history);
                         }
                         
-                        if (nextStepIndex + 1 >= seq.steps.length) {
+                        if (nextStepIndex + 1 >= steps.length) {
                             sequenceFinished = true;
                         }
                     } else {
@@ -195,7 +179,7 @@ export async function runFollowupCycle() {
                         sequenceFinished = true;
                     }
                 } catch (e) {
-                    console.error(`[Follow-up Agent]    ❌ Failed to fetch sequence ${lead.sequence}:`, e.message);
+                    console.error(`[Follow-up Agent]    ❌ Failed to fetch sequence ${lead.sequence_id}:`, e.message);
                 }
             } else {
                 // Fallback: Old 7-day AI logic
@@ -214,7 +198,11 @@ export async function runFollowupCycle() {
             }
 
             if (sequenceFinished) {
-                await pb.collection('leads').update(lead.id, { followup_active: false });
+                const updateRes = await client.query(
+                    'UPDATE public.leads SET followup_active = false WHERE id = $1 RETURNING *',
+                    [lead.id]
+                );
+                broadcast('leads:update', updateRes.rows[0]);
                 console.log(`[Follow-up Agent]    🏁 Marking ${lead.name} as finished (followup_active=false).`);
                 continue;
             }
@@ -228,26 +216,28 @@ export async function runFollowupCycle() {
 
             if (success) {
                 console.log(`[Follow-up Agent]    ✅ Message sent! Updating database...`);
-                // 4. Log the message in the 'messages' collection
-                await pb.collection('messages').create({
-                    lead: lead.id,
-                    role: 'assistant',
-                    content: messageText,
-                    source: 'Automation'
-                });
+                // 4. Log the message in the 'messages' table
+                const msgRes = await client.query(
+                    'INSERT INTO public.messages (lead_id, role, content, source) VALUES ($1, \'assistant\', $2, \'Automation\') RETURNING *',
+                    [lead.id, messageText]
+                );
+                broadcast('messages:create', msgRes.rows[0]);
 
                 // 5. Update Lead Record
-                const updateData = {
-                    followup_count: (lead.followup_count || 0) + 1,
-                    last_followup_sent: now.toISOString(),
-                    custom_followup: '' // Clear manual override if it was used
-                };
-                
-                if (sequenceFinished) {
-                    updateData.followup_active = false;
-                }
-
-                await pb.collection('leads').update(lead.id, updateData);
+                const updateQuery = `
+                    UPDATE public.leads
+                    SET followup_count = $1, last_followup_sent = $2, custom_followup = '', followup_active = $3
+                    WHERE id = $4
+                    RETURNING *
+                `;
+                const finalActiveState = !sequenceFinished;
+                const leadUpdateRes = await client.query(updateQuery, [
+                    (lead.followup_count || 0) + 1,
+                    now.toISOString(),
+                    finalActiveState,
+                    lead.id
+                ]);
+                broadcast('leads:update', leadUpdateRes.rows[0]);
                 console.log(`[Follow-up Agent]    🎉 Database updated for ${lead.name}.`);
             } else {
                 console.error(`[Follow-up Agent]    ❌ Failed to send WhatsApp message to ${lead.whatsapp}`);
@@ -255,6 +245,8 @@ export async function runFollowupCycle() {
         }
     } catch (err) {
         console.error('[Follow-up Agent] Cycle Error:', err.message);
+    } finally {
+        client.release();
     }
 }
 

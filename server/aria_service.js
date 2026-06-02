@@ -3,41 +3,14 @@ import OpenAI from 'openai';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import PocketBase from 'pocketbase';
+import pool from './db.js';
+import { broadcast } from './socket.js';
 import * as calService from './cal_service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables IMMEDIATELY
 dotenv.config({ path: join(__dirname, '../.env') });
-
-// Initialize PocketBase (Server-side)
-const pb = new PocketBase(process.env.VITE_PB_URL || 'https://pbeleveto.elevetoai.com/');
-console.log(`[Aria] PocketBase URL: ${pb.baseUrl}`);
-
-/**
- * Ensure we are authenticated as admin to create/update leads.
- */
-async function ensureAuth() {
-    try {
-        if (pb.authStore.isValid) return;
-
-        const email = process.env.PB_ADMIN_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
-        const password = process.env.PB_ADMIN_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
-
-        if (!email || !password) {
-            console.warn('[Aria] PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD missing. Attempting public create.');
-            return;
-        }
-
-        console.log(`[Aria] 🔑 Authenticating to PocketBase as ${email}...`);
-        await pb.collection('_superusers').authWithPassword(email, password);
-        console.log(`[Aria] ✅ Authenticated successfully!`);
-    } catch (err) {
-        console.error('[Aria] PB Auth Error:', err.message);
-        if (err.data) console.error('   Data:', JSON.stringify(err.data));
-    }
-}
 
 // Load Aria's system prompt from the eleveto agent directory
 const PROMPT_PATH = join(__dirname, '../eleveto agent/whatsapp_assistant_prompt.md');
@@ -130,62 +103,89 @@ const tools = [
 ];
 
 /**
- * Synchronize a lead with the PocketBase CRM.
+ * Synchronize a lead with the PostgreSQL CRM.
  */
 export async function syncLead(phone, args, status = 'Qualified') {
+    const client = await pool.connect();
     try {
-        console.log(`\n🔄 [CRM Sync] Processing lead for ${phone} (Status: ${status})`);
-        
-        // 1. Authenticate as admin
-        await ensureAuth();
-
-        // 2. Normalize data for sync
         const normalizedPhone = phone.replace('+', '').replace('@s.whatsapp.net', '');
+        console.log(`\n🔄 [CRM Sync] Processing lead for ${normalizedPhone} (Status: ${status})`);
 
-        // 3. Search for existing lead (by phone)
-        let existingRecord = null;
-        try {
-            existingRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${normalizedPhone}"`);
-        } catch (findErr) {
-            if (findErr.status !== 404) throw findErr;
-        }
+        // Search for existing lead (by phone)
+        const checkRes = await client.query('SELECT * FROM public.leads WHERE whatsapp = $1', [normalizedPhone]);
+        const existingRecord = checkRes.rows[0];
 
         let record;
         if (existingRecord) {
             console.log(`   🔄 Existing lead found: ${existingRecord.id}. Updating...`);
-            const updateData = { status };
-            if (args.name && args.name.trim() !== '') updateData.name = args.name;
-            if (args.email && args.email.trim() !== '') updateData.email = args.email;
-            if (args.country) updateData.country = args.country;
-            if (args.investment) updateData.investment = args.investment;
-            if (args.interest) updateData.interest = args.interest;
-            if (args.notes) updateData.notes = args.notes;
-            if (args.industry) updateData.industry = args.industry;
             
-            record = await pb.collection('leads').update(existingRecord.id, updateData);
+            // Build dynamic update values
+            const updates = [];
+            const values = [];
+            let placeholderIndex = 1;
+
+            const fieldsToUpdate = {
+                status,
+                name: args.name,
+                email: args.email,
+                country: args.country,
+                investment: args.investment,
+                interest: args.interest,
+                notes: args.notes,
+                industry: args.industry
+            };
+
+            for (const [key, value] of Object.entries(fieldsToUpdate)) {
+                if (value !== undefined && value !== null && String(value).trim() !== '') {
+                    updates.push(`${key} = $${placeholderIndex}`);
+                    values.push(value);
+                    placeholderIndex++;
+                }
+            }
+
+            if (updates.length > 0) {
+                values.push(existingRecord.id);
+                const queryStr = `UPDATE public.leads SET ${updates.join(', ')} WHERE id = $${placeholderIndex} RETURNING *`;
+                const updateRes = await client.query(queryStr, values);
+                record = updateRes.rows[0];
+            } else {
+                record = existingRecord;
+            }
             console.log(`   ✅ Lead updated: ${record.id}`);
+            broadcast('leads:update', record);
         } else {
             console.log(`   🆕 No existing lead for ${normalizedPhone}. Creating new...`);
-            const leadData = {
-                whatsapp: normalizedPhone,
-                name: args.name || `Lead ${normalizedPhone.slice(-4)}`,
-                email: args.email || '',
-                notes: args.notes || `Interest: ${args.interest || 'N/A'}\nInvestment: ${args.investment || 'Not shared'}\nLocation: ${args.country || 'Not shared'}\nContext: ${args.notes || 'None'}`,
-                status: status,
-                source: 'WhatsApp Assistant'
-            };
-            if (args.industry) leadData.industry = args.industry;
-            if (args.interest) leadData.interest = args.interest;
-            if (args.investment) leadData.investment = args.investment;
-            if (args.country) leadData.country = args.country;
+            
+            const insertQuery = `
+                INSERT INTO public.leads (whatsapp, name, email, notes, status, source, industry, interest, investment, country)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING *
+            `;
+            const notes = args.notes || `Interest: ${args.interest || 'N/A'}\nInvestment: ${args.investment || 'Not shared'}\nLocation: ${args.country || 'Not shared'}\nContext: ${args.notes || 'None'}`;
+            const values = [
+                normalizedPhone,
+                args.name || `Lead ${normalizedPhone.slice(-4)}`,
+                args.email || '',
+                notes,
+                status,
+                'WhatsApp Assistant',
+                args.industry || '',
+                args.interest || '',
+                args.investment || '',
+                args.country || ''
+            ];
 
-            record = await pb.collection('leads').create(leadData);
+            const insertRes = await client.query(insertQuery, values);
+            record = insertRes.rows[0];
             console.log(`   ✅ New lead created: ${record.id}`);
+            broadcast('leads:create', record);
         }
         return record;
     } catch (err) {
         console.error(`   ❌ Sync Lead Error:`, err.message);
         throw err;
+    } finally {
+        client.release();
     }
 }
 
@@ -194,164 +194,161 @@ export async function syncLead(phone, args, status = 'Qualified') {
  */
 async function handleTools(toolCalls, phone) {
     const results = [];
-    for (const toolCall of toolCalls) {
-        if (toolCall.function.name === 'save_lead') {
-            try {
-                const args = JSON.parse(toolCall.function.arguments);
-                const record = await syncLead(phone, args, 'Qualified');
-                
-                results.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: "save_lead",
-                    content: `SUCCESS: Lead ${record.name} was registered in the CRM. You can now invite them to the Strategy Meeting.`
-                });
-            } catch (err) {
-                results.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: "save_lead",
-                    content: "FAIL: Could not save lead to CRM due to a technical error."
-                });
-            }
-        } else if (toolCall.function.name === 'get_available_slots') {
-            try {
-                const args = JSON.parse(toolCall.function.arguments);
-                const slots = await calService.getAvailableSlots(args.date);
-                
-                // Format slots to IST for the AI to present correctly
-                const istSlots = slots.map(slot => {
-                    const date = new Date(slot);
-                    const ist = date.toLocaleTimeString('en-IN', { 
-                        timeZone: 'Asia/Kolkata', 
-                        hour: '2-digit', 
-                        minute: '2-digit', 
-                        hour12: true 
-                    });
-                    return `${ist} (ISO: ${slot})`;
-                });
-
-                results.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: "get_available_slots",
-                    content: istSlots.length > 0 
-                        ? `Available slots for ${args.date} in IST: ${istSlots.join(', ')}. PROMPT: Present these times in IST to the user. Use the ISO string in parentheses when calling book_meeting.`
-                        : `No slots available for ${args.date}. Please try another date.`
-                });
-            } catch (err) {
-                results.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: "get_available_slots",
-                    content: `Error checking slots: ${err.message}`
-                });
-            }
-        } else if (toolCall.function.name === 'book_meeting') {
-            try {
-                const args = JSON.parse(toolCall.function.arguments);
-                console.log(`\n📅 [Aria Tool] Booking meeting for ${args.name} at ${args.start}`);
-                
-                const booking = await calService.createBooking({
-                    name: args.name,
-                    email: args.email,
-                    phone: args.phone,
-                    start: args.start
-                });
-
-                // --- Sync to PocketBase 'bookings' collection ---
+    const client = await pool.connect();
+    try {
+        for (const toolCall of toolCalls) {
+            if (toolCall.function.name === 'save_lead') {
                 try {
-                    console.log(`   🔄 Syncing to PocketBase...`);
-                    await ensureAuth();
+                    const args = JSON.parse(toolCall.function.arguments);
+                    const record = await syncLead(phone, args, 'Qualified');
                     
-                    // Try to find the lead and update with email
-                    let leadId = null;
+                    results.push({
+                        tool_call_id: toolCall.id,
+                        role: "tool",
+                        name: "save_lead",
+                        content: `SUCCESS: Lead ${record.name} was registered in the CRM. You can now invite them to the Strategy Meeting.`
+                    });
+                } catch (err) {
+                    results.push({
+                        tool_call_id: toolCall.id,
+                        role: "tool",
+                        name: "save_lead",
+                        content: "FAIL: Could not save lead to CRM due to a technical error."
+                    });
+                }
+            } else if (toolCall.function.name === 'get_available_slots') {
+                try {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    const slots = await calService.getAvailableSlots(args.date);
+                    
+                    const istSlots = slots.map(slot => {
+                        const date = new Date(slot);
+                        const ist = date.toLocaleTimeString('en-IN', { 
+                            timeZone: 'Asia/Kolkata', 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            hour12: true 
+                        });
+                        return `${ist} (ISO: ${slot})`;
+                    });
+
+                    results.push({
+                        tool_call_id: toolCall.id,
+                        role: "tool",
+                        name: "get_available_slots",
+                        content: istSlots.length > 0 
+                            ? `Available slots for ${args.date} in IST: ${istSlots.join(', ')}. PROMPT: Present these times in IST to the user. Use the ISO string in parentheses when calling book_meeting.`
+                            : `No slots available for ${args.date}. Please try another date.`
+                    });
+                } catch (err) {
+                    results.push({
+                        tool_call_id: toolCall.id,
+                        role: "tool",
+                        name: "get_available_slots",
+                        content: `Error checking slots: ${err.message}`
+                    });
+                }
+            } else if (toolCall.function.name === 'book_meeting') {
+                try {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    console.log(`\n📅 [Aria Tool] Booking meeting for ${args.name} at ${args.start}`);
+                    
+                    const booking = await calService.createBooking({
+                        name: args.name,
+                        email: args.email,
+                        phone: args.phone,
+                        start: args.start
+                    });
+
+                    // Sync to PostgreSQL bookings
                     try {
-                        const lead = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
+                        console.log(`   🔄 Syncing to PostgreSQL...`);
+                        
+                        // Try to find the lead and update with email
+                        let leadId = null;
+                        const leadRes = await client.query('SELECT * FROM public.leads WHERE whatsapp = $1', [phone.replace('+', '')]);
+                        const lead = leadRes.rows[0];
+
                         if (lead) {
                             leadId = lead.id;
-                            // Also save the email to the lead record
                             if (args.email && !lead.email) {
-                                await pb.collection('leads').update(lead.id, { email: args.email });
+                                await client.query('UPDATE public.leads SET email = $1 WHERE id = $2', [args.email, lead.id]);
                                 console.log(`   📧 Email saved to lead: ${args.email}`);
                             }
                         }
-                    } catch (e) {
-                        console.log(`   ⚠️ Lead not found for sync, creating orphan booking.`);
-                    }
 
-                    // Build the booking record
-                    console.log(`   📦 Cal.com response keys:`, Object.keys(booking));
-                    // Cal.com v1 sometimes returns { booking: { ... } }, sometimes just the object
-                    const b = booking.booking || booking;
-                    const bookingId = b.id || 'N/A';
-                    const bookingUid = b.uid || '';
-                    
-                    const videoCallUrl = b.metadata?.videoCallUrl || b.videoCallUrl || '';
-                    const rescheduleUrl = bookingUid ? `https://cal.com/reschedule/${bookingUid}` : '';
-                    
-                    const bookingRecord = {
-                        title: `Strategy Meeting with ${args.name}`,
-                        date: args.start,
-                        duration: 30,
-                        status: 'Scheduled',
-                        notes: `Booked by Aria via Cal.com (ID: ${bookingId})`,
-                        reschedule_link: rescheduleUrl,
-                        reminders_sent: [] // Initialize as empty array, background service will handle
-                    };
-                    // Only add optional fields if they have valid values
-                    if (leadId) bookingRecord.lead_id = leadId;
-                    if (videoCallUrl && videoCallUrl.startsWith('http')) {
-                        bookingRecord.meeting_link = videoCallUrl;
-                    }
+                        const b = booking.booking || booking;
+                        const bookingId = b.id || 'N/A';
+                        const bookingUid = b.uid || '';
+                        const videoCallUrl = b.metadata?.videoCallUrl || b.videoCallUrl || '';
+                        const rescheduleUrl = bookingUid ? `https://cal.com/reschedule/${bookingUid}` : '';
 
-                    await pb.collection('bookings').create(bookingRecord);
-                    console.log(`   ✅ Booking synced successfully! (ID: ${bookingId})`);
+                        const insertBookingQuery = `
+                            INSERT INTO public.bookings (title, date, duration, status, notes, reschedule_link, lead_id, meeting_link, reminders_sent)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                            RETURNING *
+                        `;
+                        const bValues = [
+                            `Strategy Meeting with ${args.name}`,
+                            args.start,
+                            30,
+                            'Scheduled',
+                            `Booked by Aria via Cal.com (ID: ${bookingId})`,
+                            rescheduleUrl,
+                            leadId,
+                            videoCallUrl,
+                            JSON.stringify([])
+                        ];
 
-                    // --- Immediate Confirmation Message ---
-                    const formattedTime = new Date(args.start).toLocaleString('en-IN', {
-                        timeZone: 'Asia/Kolkata',
-                        dateStyle: 'full',
-                        timeStyle: 'short'
-                    });
+                        const bRes = await client.query(insertBookingQuery, bValues);
+                        console.log(`   ✅ Booking synced successfully! (ID: ${bookingId})`);
+                        broadcast('bookings:create', bRes.rows[0]);
 
-                    const confirmationText = `✅ *Meeting Confirmed!*
+                        // Immediate Confirmation Message
+                        const formattedTime = new Date(args.start).toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata',
+                            dateStyle: 'full',
+                            timeStyle: 'short'
+                        });
 
+                        const confirmationText = `✅ *Meeting Confirmed!*
+ 
 Hi ${args.name}, your Strategy Meeting is booked.
-
+ 
 📅 *Date:* ${formattedTime}
 🔗 *Meeting Link:* ${videoCallUrl || 'Coming soon to your calendar'}
 🔄 *Reschedule:* ${rescheduleUrl || 'Check your email'}
-
+ 
 *What’s Next?*
 1. Check your email for the calendar invite.
 2. I will send you reminders 24h, 1h, and 10 mins before we start! 👋`;
-                    
-                    const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
-                    await sendWhatsAppMessage(phone, confirmationText, instanceName);
-                    console.log(`   📱 Confirmation sent to ${phone} using instance ${instanceName}`);
+                        
+                        const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
+                        await sendWhatsAppMessage(phone, confirmationText, instanceName);
 
-                } catch (syncErr) {
-                    console.error(`   ⚠️ Sync failed (ignoring to not break booking):`, syncErr.message);
+                    } catch (syncErr) {
+                        console.error(`   ⚠️ Sync failed (ignoring to not break booking):`, syncErr.message);
+                    }
+
+                    results.push({
+                        tool_call_id: toolCall.id,
+                        role: "tool",
+                        name: "book_meeting",
+                        content: `SUCCESS: Meeting booked! Booking ID: ${booking.id}. Please confirm with the user.`
+                    });
+                } catch (err) {
+                    console.error(`   ❌ Booking Error:`, err.message);
+                    results.push({
+                        tool_call_id: toolCall.id,
+                        role: "tool",
+                        name: "book_meeting",
+                        content: `FAIL: Error booking meeting via Cal.com: ${err.message}. Please apologize and ask for assistance.`
+                    });
                 }
-                // -----------------------------------------------
-
-                results.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: "book_meeting",
-                    content: `SUCCESS: Meeting booked! Booking ID: ${booking.id}. Please confirm with the user.`
-                });
-            } catch (err) {
-                console.error(`   ❌ Booking Error:`, err.message);
-                results.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: "book_meeting",
-                    content: `FAIL: Error booking meeting via Cal.com: ${err.message}. Please apologize and ask for assistance.`
-                });
             }
         }
+    } finally {
+        client.release();
     }
     return results;
 }
@@ -360,6 +357,7 @@ Hi ${args.name}, your Strategy Meeting is booked.
  * Process an incoming message through Aria (OpenAI).
  */
 export async function processAriaMessage(openai, userInput, phone) {
+    const client = await pool.connect();
     try {
         if (!sessions.has(phone)) {
             console.log(`[Aria] New session for ${phone}`);
@@ -369,35 +367,39 @@ export async function processAriaMessage(openai, userInput, phone) {
         const systemPrompt = { role: 'system', content: loadSystemPrompt() };
         let messages = [systemPrompt, ...history, { role: 'user', content: userInput }];
 
-        // --- Persistence: LOG USER MESSAGE ---
+        // --- Log User Message ---
+        let leadRecord = null;
         try {
-            await ensureAuth();
-            let leadRecord;
-            try {
-                leadRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`);
-            } catch (e) {
-                // Create draft lead if not found
-                leadRecord = await pb.collection('leads').create({
-                    whatsapp: phone,
-                    name: `Draft Lead (${phone.slice(-4)})`,
-                    status: 'Qualified',
-                    investment: 'Not shared',
-                    country: 'Unknown'
-                });
+            const normalizedPhone = phone.replace('+', '').replace('@s.whatsapp.net', '');
+            const leadRes = await client.query('SELECT * FROM public.leads WHERE whatsapp = $1', [normalizedPhone]);
+            leadRecord = leadRes.rows[0];
+
+            if (!leadRecord) {
+                const insertRes = await client.query(
+                    'INSERT INTO public.leads (whatsapp, name, status, investment, country) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+                    [normalizedPhone, `Draft Lead (${normalizedPhone.slice(-4)})`, 'Qualified', 'Not shared', 'Unknown']
+                );
+                leadRecord = insertRes.rows[0];
+                broadcast('leads:create', leadRecord);
                 console.log(`[Aria Log] Draft lead created for ${phone} to start logging.`);
             }
 
             if (leadRecord) {
-                await pb.collection('messages').create({
-                    lead: leadRecord.id,
-                    role: 'user',
-                    content: userInput
-                });
+                const msgRes = await client.query(
+                    'INSERT INTO public.messages (lead_id, role, content, source) VALUES ($1, $2, $3, $4) RETURNING *',
+                    [leadRecord.id, 'user', userInput, 'WhatsApp']
+                );
+                broadcast('messages:create', msgRes.rows[0]);
+
+                // Check if AI is paused
+                if (leadRecord.ai_disabled) {
+                    console.log(`[Aria] AI is paused for ${phone}. Logged message, skipping AI reply.`);
+                    return null;
+                }
             }
         } catch (logErr) {
             console.error('[Aria Log Error] User message:', logErr.message);
         }
-        // -------------------------------------
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -421,20 +423,18 @@ export async function processAriaMessage(openai, userInput, phone) {
 
             const finalReply = secondResponse.choices[0].message.content || "Success — I've updated your status.";
             
-            // --- Persistence: LOG ASSISTANT MESSAGE ---
+            // --- Log Assistant Message ---
             try {
-                const leadRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
                 if (leadRecord) {
-                    await pb.collection('messages').create({
-                        lead: leadRecord.id,
-                        role: 'assistant',
-                        content: finalReply
-                    });
+                    const msgRes = await client.query(
+                        'INSERT INTO public.messages (lead_id, role, content, source) VALUES ($1, $2, $3, $4) RETURNING *',
+                        [leadRecord.id, 'assistant', finalReply, 'WhatsApp']
+                    );
+                    broadcast('messages:create', msgRes.rows[0]);
                 }
             } catch (logErr) {
                 console.error('[Aria Log Error] Assistant response:', logErr.message);
             }
-            // ------------------------------------------
 
             history.push({ role: 'user', content: userInput });
             history.push({ role: 'assistant', content: finalReply });
@@ -447,20 +447,18 @@ export async function processAriaMessage(openai, userInput, phone) {
         const replyText = responseMessage.content?.trim()
             || "I'm having a moment — could you say that again?";
 
-        // --- Persistence: LOG ASSISTANT RESPONSE ---
+        // --- Log Assistant Response ---
         try {
-            const leadRecord = await pb.collection('leads').getFirstListItem(`whatsapp="${phone}"`).catch(() => null);
             if (leadRecord) {
-                await pb.collection('messages').create({
-                    lead: leadRecord.id,
-                    role: 'assistant',
-                    content: replyText
-                });
+                const msgRes = await client.query(
+                    'INSERT INTO public.messages (lead_id, role, content, source) VALUES ($1, $2, $3, $4) RETURNING *',
+                    [leadRecord.id, 'assistant', replyText, 'WhatsApp']
+                );
+                broadcast('messages:create', msgRes.rows[0]);
             }
         } catch (logErr) {
             console.error('[Aria Log Error] Assistant response:', logErr.message);
         }
-        // ------------------------------------------
 
         history.push({ role: 'user', content: userInput });
         history.push({ role: 'assistant', content: replyText });
@@ -476,6 +474,8 @@ export async function processAriaMessage(openai, userInput, phone) {
             return "I'm a little overwhelmed right now — please try again in a moment! 🙏";
         }
         return "Sorry, I ran into an issue. Please try again shortly.";
+    } finally {
+        client.release();
     }
 }
 
@@ -511,6 +511,59 @@ export async function sendWhatsAppMessage(remoteJid, text, instanceName) {
         return false;
     } catch (err) {
         console.error('[Aria] ❌ Send error:', err.message);
+        return false;
+    }
+}
+
+/**
+ * Send a media message via Evolution API.
+ */
+export async function sendWhatsAppMedia(remoteJid, base64Data, mimetype, fileName, caption, instanceName) {
+    const evoUrlSource = process.env.EVOLUTION_API_URL || '';
+    const evoUrl = evoUrlSource.endsWith('/') ? evoUrlSource.slice(0, -1) : evoUrlSource;
+    const evoKey = process.env.EVOLUTION_API_KEY;
+
+    if (!evoUrl || !evoKey) {
+        console.error('[Aria] Missing Evolution API credentials. Cannot send media.');
+        return false;
+    }
+
+    try {
+        const cleanNumber = remoteJid.replace('+', '').replace('@s.whatsapp.net', '');
+        
+        let mediatype = 'document';
+        if (mimetype.startsWith('image/')) mediatype = 'image';
+        else if (mimetype.startsWith('video/')) mediatype = 'video';
+        else if (mimetype.startsWith('audio/')) mediatype = 'audio';
+
+        const bodyPayload = {
+            number: cleanNumber,
+            options: { delay: 1200, presence: 'composing' },
+            mediaMessage: {
+                mediatype,
+                media: base64Data
+            }
+        };
+
+        if (fileName) bodyPayload.mediaMessage.fileName = fileName;
+        if (caption) bodyPayload.mediaMessage.caption = caption;
+
+        const response = await fetch(`${evoUrl}/message/sendMedia/${instanceName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
+            body: JSON.stringify(bodyPayload)
+        });
+        
+        if (response.ok) {
+            console.log(`[Aria] ✅ Sent media reply to ${cleanNumber}`);
+            return true;
+        }
+        
+        const errBody = await response.text();
+        console.error(`[Aria] ❌ Failed to send media. Status: ${response.status}`, errBody);
+        return false;
+    } catch (err) {
+        console.error('[Aria] ❌ Send media error:', err.message);
         return false;
     }
 }

@@ -5,10 +5,14 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         - VITE_PB_URL=${VITE_PB_URL}
+        - VITE_API_URL=${VITE_API_URL}
     ports:
       - "5173:80"
     environment:
       - VITE_PB_URL=${VITE_PB_URL}
+      - VITE_API_URL=${VITE_API_URL}
+    labels:
+      - "coolify.fqdn=${VITE_FQDN_FRONTEND:-https://elevetoai.com}"
     restart: always
     deploy:
       resources:
@@ -29,7 +33,12 @@ services:
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - INSTANCE_NAME=${INSTANCE_NAME}
       - CALCOM_LINK=${CALCOM_LINK}
+      - Database_url=${Database_url}
+      - Database_password=${Database_password}
+      - JWT_SECRET=${JWT_SECRET:-super_secure_eleveto_ai_key_1997}
       - PORT=3001
+    labels:
+      - "coolify.fqdn=${VITE_FQDN_BACKEND:-https://api.elevetoai.com}"
     restart: always
     deploy:
       resources:
