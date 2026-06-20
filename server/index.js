@@ -1288,6 +1288,106 @@ app.post('/webhook', async (req, res) => {
 
 /**
  * ─────────────────────────────────────────────────
+ *  META ADS LEAD GEN WEBHOOK
+ * ─────────────────────────────────────────────────
+ */
+
+// GET /api/webhooks/meta (Meta verification challenge)
+app.get('/api/webhooks/meta', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    const verifyToken = process.env.META_VERIFY_TOKEN || 'elevetoai1997leadform';
+
+    if (mode === 'subscribe' && token === verifyToken) {
+        console.log('✅ Meta Webhook verified successfully.');
+        return res.status(200).send(challenge);
+    }
+    console.warn('❌ Meta Webhook verification failed. Token mismatch.');
+    res.sendStatus(403);
+});
+
+// POST /api/webhooks/meta (Receives webhook event)
+app.post('/api/webhooks/meta', async (req, res) => {
+    const body = req.body;
+
+    // Acknowledge the event receipt immediately to Meta to avoid timeouts
+    res.status(200).send('EVENT_RECEIVED');
+
+    if (body.object === 'page') {
+        try {
+            for (const entry of body.entry) {
+                if (!entry.changes) continue;
+                for (const change of entry.changes) {
+                    if (change.field === 'leadgen') {
+                        const leadgenId = change.value.leadgen_id;
+                        console.log(`\n📥 [Meta Webhook] New lead gen notification: leadgen_id=${leadgenId}`);
+
+                        // Fetch details from Meta Graph API
+                        const pageAccessToken = process.env.META_PAGE_ACCESS_TOKEN;
+                        if (!pageAccessToken) {
+                            console.error('❌ Error: META_PAGE_ACCESS_TOKEN not set in environment.');
+                            continue;
+                        }
+
+                        const graphUrl = `https://graph.facebook.com/v20.0/${leadgenId}?access_token=${pageAccessToken}`;
+                        const response = await fetch(graphUrl);
+                        if (!response.ok) {
+                            const errBody = await response.text();
+                            console.error(`❌ Meta Graph API fetch failed (status ${response.status}):`, errBody);
+                            continue;
+                        }
+
+                        const metaLead = await response.json();
+                        console.log('🔍 [Meta Webhook] Lead data fetched:', JSON.stringify(metaLead));
+
+                        let name = 'Meta Lead';
+                        let email = '';
+                        let phone = '';
+                        let customNotes = '📋 META LEAD FORM RESPONSES:\n';
+
+                        metaLead.field_data?.forEach(field => {
+                            if (field.name === 'full_name') {
+                                name = field.values[0] || name;
+                            } else if (field.name === 'email') {
+                                email = field.values[0] || email;
+                            } else if (field.name === 'phone_number') {
+                                phone = field.values[0] || phone;
+                            } else {
+                                const question = field.name.replace(/_/g, ' ');
+                                const value = field.values[0] || 'N/A';
+                                customNotes += `• ${question}: ${value}\n`;
+                            }
+                        });
+
+                        if (!phone) {
+                            console.warn('⚠️ Meta lead gen event missing phone number. Skipping.');
+                            continue;
+                        }
+
+                        // Normalize phone number (keep digits only)
+                        const normalizedPhone = phone.replace(/\D/g, '');
+
+                        // Sync to database using our robust syncLead helper
+                        await syncLead(normalizedPhone, {
+                            name,
+                            email,
+                            notes: customNotes,
+                            interest: 'Meta Ads Lead',
+                            source: 'Meta Ads'
+                        }, 'Lead');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ [Meta Webhook processing error]:', error.message);
+        }
+    }
+});
+
+/**
+ * ─────────────────────────────────────────────────
  *  CAL.COM BOOKING WEBHOOK
  * ─────────────────────────────────────────────────
  */
