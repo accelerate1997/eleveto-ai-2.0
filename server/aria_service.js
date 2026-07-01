@@ -277,10 +277,10 @@ async function handleTools(toolCalls, phone) {
                             }
                         }
 
-                        const b = booking.booking || booking;
-                        const bookingId = b.id || 'N/A';
+                        const b = booking.booking || booking.data || booking;
+                        const bookingId = b.id || b.uid || 'N/A';
                         const bookingUid = b.uid || '';
-                        const videoCallUrl = b.metadata?.videoCallUrl || b.videoCallUrl || '';
+                        const videoCallUrl = b.meetingUrl || b.metadata?.videoCallUrl || b.videoCallUrl || '';
                         const rescheduleUrl = bookingUid ? `https://cal.com/reschedule/${bookingUid}` : '';
 
                         const insertBookingQuery = `

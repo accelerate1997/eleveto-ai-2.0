@@ -7,7 +7,7 @@ dotenv.config({ path: join(__dirname, '../.env') });
 
 const API_KEY = process.env.CALCOM_API_KEY;
 const EVENT_TYPE_ID = process.env.CALCOM_EVENT_TYPE_ID;
-const BASE_URL = 'https://api.cal.com/v1';
+const BASE_URL = 'https://api.cal.com/v2';
 
 /**
  * Get available slots for a specific date.
@@ -21,18 +21,25 @@ export async function getAvailableSlots(date) {
     const startTime = `${date}T00:00:00Z`;
     const endTime = `${date}T23:59:59Z`;
 
-    const url = `${BASE_URL}/slots?apiKey=${API_KEY}&eventTypeId=${EVENT_TYPE_ID}&startTime=${startTime}&endTime=${endTime}`;
+    const url = `${BASE_URL}/slots?start=${startTime}&end=${endTime}&eventTypeId=${EVENT_TYPE_ID}`;
     
     console.log(`[Cal.com] Fetching slots for ${date}...`);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+        headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'cal-api-version': '2024-08-13'
+        }
+    });
+
     if (!response.ok) {
         const err = await response.text();
         throw new Error(`Cal.com Error: ${err}`);
     }
 
-    const data = await response.json();
-    const daySlots = data.slots[date] || [];
-    return daySlots.map(s => s.time);
+    const resJson = await response.json();
+    const data = resJson.data || resJson;
+    const daySlots = data.slots?.[date] || [];
+    return daySlots.map(s => s.time || s);
 }
 
 /**
@@ -42,26 +49,28 @@ export async function getAvailableSlots(date) {
 export async function createBooking(bookingData) {
     if (!API_KEY) throw new Error('Cal.com API Key missing');
 
-    const url = `${BASE_URL}/bookings?apiKey=${API_KEY}`;
+    const url = `${BASE_URL}/bookings`;
     
     const payload = {
-        eventTypeId: parseInt(EVENT_TYPE_ID),
         start: bookingData.start,
-        responses: {
+        eventTypeId: parseInt(EVENT_TYPE_ID),
+        attendee: {
             name: bookingData.name,
             email: bookingData.email,
-            attendeePhoneNumber: bookingData.phone,
-            title: `Strategy Meeting with ${bookingData.name}`,
-        },
-        timeZone: 'Asia/Kolkata',
-        language: 'en',
-        metadata: {},
+            timeZone: 'Asia/Kolkata',
+            language: 'en',
+            phoneNumber: bookingData.phone
+        }
     };
 
     console.log(`[Cal.com] Creating booking for ${bookingData.name} at ${bookingData.start}...`);
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${API_KEY}`,
+            'cal-api-version': '2024-08-13'
+        },
         body: JSON.stringify(payload)
     });
 
