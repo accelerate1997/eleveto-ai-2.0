@@ -27,7 +27,7 @@ export async function getAvailableSlots(date) {
     const response = await fetch(url, {
         headers: {
             'Authorization': `Bearer ${API_KEY}`,
-            'cal-api-version': '2024-08-13'
+            'cal-api-version': '2024-09-04'
         }
     });
 
@@ -38,8 +38,8 @@ export async function getAvailableSlots(date) {
 
     const resJson = await response.json();
     const data = resJson.data || resJson;
-    const daySlots = data.slots?.[date] || [];
-    return daySlots.map(s => s.time || s);
+    const daySlots = data[date] || data.slots?.[date] || [];
+    return daySlots.map(s => s.start || s.time || s);
 }
 
 /**
@@ -69,7 +69,7 @@ export async function createBooking(bookingData) {
         headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${API_KEY}`,
-            'cal-api-version': '2024-08-13'
+            'cal-api-version': '2024-09-04'
         },
         body: JSON.stringify(payload)
     });
