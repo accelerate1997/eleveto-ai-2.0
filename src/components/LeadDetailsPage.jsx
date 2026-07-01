@@ -27,6 +27,7 @@ export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) 
         country: lead.country || '',
         industry: lead.industry || '',
         investment: lead.investment || '',
+        notes: lead.notes || '',
         followup_date: lead.followup_date ? lead.followup_date.split(' ')[0] : '',
         sequence: lead.sequence || '',
     });
@@ -316,6 +317,11 @@ export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) 
                                 </div>
                             )}
 
+                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                <label htmlFor="edit-notes" style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Qualification Notes</label>
+                                <textarea id="edit-notes" name="notes" rows={5} value={form.notes} onChange={handleChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.1)', outline: 'none', background: 'var(--neural-bg)', fontFamily: 'inherit', resize: 'vertical' }} />
+                            </div>
+
                             <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
                                 <button onClick={handleSave} disabled={isSaving} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 2rem', background: 'var(--primary-indigo)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>
                                     {isSaving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />} Save Changes
@@ -340,6 +346,18 @@ export default function LeadDetailsPage({ lead, onBack, onUpdated, onDeleted }) 
                                     <InfoRow icon={Zap} label="Assigned Sequence" value={lead.expand?.sequence?.name || 'Default AI Logic'} />
                                 </>
                             )}
+
+                            {lead.notes && (
+                                <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'rgba(79, 70, 229, 0.04)', borderRadius: '12px', border: '1px solid rgba(79, 70, 229, 0.1)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary-indigo)', marginBottom: '10px' }}>
+                                        <Bot size={14} /> Qualification Notes
+                                    </div>
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontWeight: 500 }}>
+                                        {lead.notes}
+                                    </div>
+                                </div>
+                            )}
+
                             <div style={{ padding: '1rem 0', fontSize: '0.75rem', color: '#94a3b8', marginTop: '1rem' }}>
                                 Added {new Date(lead.created).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 {lead.expand?.created_by && ` • Source: ${lead.expand.created_by.name || lead.expand.created_by.username}`}

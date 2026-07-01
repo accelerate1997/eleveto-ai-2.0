@@ -63,7 +63,7 @@ const tools = [
                     investment: { type: "string", description: "The investment amount they are willing to put towards their growth (e.g., '500k', 'flexible', etc.). NEVER use the word 'budget'." },
                     country: { type: "string", description: "Their location or country" },
                     industry: { type: "string", description: "The specific industry their business operates in (e.g., Real Estate, E-commerce, Healthcare)" },
-                    notes: { type: "string", description: "Any additional context from the conversation" }
+                    notes: { type: "string", description: "MANDATORY: A cumulative, structured Q&A list of all the qualification questions asked and the answers provided by the lead so far (e.g., 'Q: What type of business do you have?\nA: Retail Shop\nQ: Do you currently have a website?\nA: No - I need one built from scratch'). Keep adding to this log as the conversation progresses." }
                 },
                 required: ["name", "interest"]
             }
