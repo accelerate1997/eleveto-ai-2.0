@@ -961,15 +961,20 @@ async function syncCalBookings(apiKey) {
     if (!apiKey) throw new Error('No Cal.com API Key configured.');
 
     console.log(`\n[Cal.com Sync] 🔄 Fetching bookings from Cal.com...`);
-    const response = await fetch(`https://api.cal.com/v1/bookings?apiKey=${apiKey}&status=upcoming`);
+    const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming`, {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'cal-api-version': '2024-08-13'
+        }
+    });
 
     if (!response.ok) {
         const errData = await response.text();
         throw new Error(`Cal.com error: ${errData}`);
     }
 
-    const data = await response.json();
-    const calBookings = data.bookings || [];
+    const resJson = await response.json();
+    const calBookings = resJson.data || resJson.bookings || [];
     console.log(`[Cal.com Sync] 📥 Found ${calBookings.length} upcoming bookings`);
 
     const client = await pool.connect();
@@ -979,7 +984,7 @@ async function syncCalBookings(apiKey) {
     try {
         for (const booking of calBookings) {
             try {
-                const date = booking.startTime || booking.start;
+                const date = booking.start || booking.startTime;
                 const startTime = new Date(date);
 
                 if (startTime < now) {
@@ -995,9 +1000,9 @@ async function syncCalBookings(apiKey) {
                 };
                 const status = statusMap[booking.status?.toLowerCase()] || 'Scheduled';
                 const title = (booking.title || `Meeting with ${booking.attendees?.[0]?.name || 'Guest'}`).trim() || 'Cal.com Meeting';
-                const rawDuration = booking.eventLength ?? booking.duration ?? booking.length;
+                const rawDuration = booking.duration ?? booking.eventLength ?? booking.length;
                 const duration = (typeof rawDuration === 'number' && rawDuration > 0) ? rawDuration : 30;
-                const meetingLink = booking.metadata?.videoCallUrl || '';
+                const meetingLink = booking.meetingUrl || booking.metadata?.videoCallUrl || '';
                 const calId = String(booking.id);
                 const rescheduleUrl = booking.uid ? `https://cal.com/reschedule/${booking.uid}` : '';
 
