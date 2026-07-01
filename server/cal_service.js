@@ -1,83 +1,96 @@
 import * as dotenv from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import pool from './db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../.env') });
 
-const API_KEY = process.env.CALCOM_API_KEY;
-const EVENT_TYPE_ID = process.env.CALCOM_EVENT_TYPE_ID;
-const BASE_URL = 'https://api.cal.com/v2';
-
 /**
- * Get available slots for a specific date.
+ * Get available slots for a specific date (local booking engine).
+ * Generates slots from 10:00 AM to 6:00 PM IST (Asia/Kolkata).
+ * Excludes slots that conflict with existing scheduled bookings.
  * @param {string} date - ISO date string (YYYY-MM-DD)
  */
 export async function getAvailableSlots(date) {
-    if (!API_KEY || !EVENT_TYPE_ID) {
-        throw new Error('Cal.com credentials missing');
+    console.log(`[Custom Booking Engine] Generating slots for ${date}...`);
+    
+    // 1. Generate all possible 30-minute slots in IST (10:00 AM to 6:00 PM)
+    const possibleSlots = [];
+    const startHour = 10;
+    const endHour = 18;
+
+    for (let hour = startHour; hour < endHour; hour++) {
+        for (const minute of [0, 30]) {
+            // Generate time string in IST
+            const dateStr = `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+            // Parse in IST (+05:30) and get UTC ISO string
+            const dateObj = new Date(`${dateStr}+05:30`);
+            possibleSlots.push(dateObj.toISOString());
+        }
     }
 
-    const startTime = `${date}T00:00:00Z`;
-    const endTime = `${date}T23:59:59Z`;
-
-    const url = `${BASE_URL}/slots?start=${startTime}&end=${endTime}&eventTypeId=${EVENT_TYPE_ID}`;
+    // 2. Fetch existing active bookings on that day
+    const dayStart = new Date(`${date}T00:00:00+05:30`).toISOString();
+    const dayEnd = new Date(`${date}T23:59:59+05:30`).toISOString();
     
-    console.log(`[Cal.com] Fetching slots for ${date}...`);
-    const response = await fetch(url, {
-        headers: {
-            'Authorization': `Bearer ${API_KEY}`,
-            'cal-api-version': '2024-09-04'
-        }
+    const query = `
+        SELECT date, duration 
+        FROM public.bookings 
+        WHERE status != 'Cancelled' 
+          AND date >= $1 
+          AND date <= $2
+    `;
+    const dbRes = await pool.query(query, [dayStart, dayEnd]);
+
+    // 3. Filter out slots that overlap with any existing booking
+    const availableSlots = possibleSlots.filter(slot => {
+        const slotStartMs = new Date(slot).getTime();
+        const slotEndMs = slotStartMs + 30 * 60 * 1000; // 30 mins slot duration
+
+        const hasConflict = dbRes.rows.some(booking => {
+            const bookingStartMs = new Date(booking.date).getTime();
+            const bookingEndMs = bookingStartMs + (booking.duration || 30) * 60 * 1000;
+            // Standard overlap check
+            return slotStartMs < bookingEndMs && bookingStartMs < slotEndMs;
+        });
+
+        return !hasConflict;
     });
 
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Cal.com Error: ${err}`);
-    }
-
-    const resJson = await response.json();
-    const data = resJson.data || resJson;
-    const daySlots = data[date] || data.slots?.[date] || [];
-    return daySlots.map(s => s.start || s.time || s);
+    console.log(`[Custom Booking Engine] Found ${availableSlots.length} available slots.`);
+    return availableSlots;
 }
 
 /**
- * Create a booking in Cal.com.
+ * Create mock booking details for local CRM persistence (local booking engine).
  * @param {object} bookingData - { name, email, phone, start }
  */
 export async function createBooking(bookingData) {
-    if (!API_KEY) throw new Error('Cal.com API Key missing');
-
-    const url = `${BASE_URL}/bookings`;
+    console.log(`[Custom Booking Engine] Creating booking template for ${bookingData.name} at ${bookingData.start}...`);
     
-    const payload = {
-        start: bookingData.start,
-        eventTypeId: parseInt(EVENT_TYPE_ID),
-        attendee: {
-            name: bookingData.name,
-            email: bookingData.email,
-            timeZone: 'Asia/Kolkata',
-            language: 'en',
-            phoneNumber: bookingData.phone
+    const cleanName = bookingData.name.replace(/[^a-zA-Z0-9]/g, '-');
+    const randomSuffix = Math.random().toString(36).substring(2, 7);
+    const meetingId = `Eleveto-Strategy-${cleanName}-${randomSuffix}`;
+    const meetingLink = `https://meet.jit.si/${meetingId}`;
+    const bookingId = 'local-' + Math.random().toString(36).substring(2, 9);
+
+    return {
+        status: 'success',
+        data: {
+            id: bookingId,
+            uid: bookingId,
+            title: `Strategy Meeting with ${bookingData.name}`,
+            startTime: bookingData.start,
+            status: 'Scheduled',
+            meetingUrl: meetingLink,
+            attendees: [
+                {
+                    name: bookingData.name,
+                    email: bookingData.email,
+                    phoneNumber: bookingData.phone
+                }
+            ]
         }
     };
-
-    console.log(`[Cal.com] Creating booking for ${bookingData.name} at ${bookingData.start}...`);
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_KEY}`,
-            'cal-api-version': '2024-09-04'
-        },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Cal.com Booking Error: ${err}`);
-    }
-
-    return await response.json();
 }
