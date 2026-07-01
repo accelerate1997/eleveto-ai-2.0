@@ -447,15 +447,6 @@ export default function BookingManagement() {
 // ── Shared Card Component ──────────────────────────────────────────────────
 function BookingCard({ booking, onEdit, onStatusChange, onDelete, isPast }) {
     const lead = booking.expand?.lead_id;
-    let displayName = 'Unknown Contact';
-    if (lead && lead.name) {
-        displayName = lead.name;
-    } else if (booking.notes) {
-        const match = booking.notes.match(/Booked by\s+([^.(]+)/i);
-        if (match && match[1]) {
-            displayName = match[1].trim();
-        }
-    }
     const dateObj = new Date(booking.date);
 
     const formattedDate = dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -484,7 +475,7 @@ function BookingCard({ booking, onEdit, onStatusChange, onDelete, isPast }) {
                         <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--neural-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Users size={12} color="var(--primary-indigo)" />
                         </div>
-                        {displayName}
+                        {lead ? lead.name : 'Unknown Contact'}
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

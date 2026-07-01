@@ -96,7 +96,7 @@ export default function Integrations() {
                 
                 setIsConnecting('google_calendar');
                 try {
-                    const redirectUri = window.location.origin + '/';
+                    const redirectUri = window.location.origin;
                     console.log(`[Integrations] Completing Google handshake with redirect: ${redirectUri}`);
                     
                     const response = await fetch('/api/integrations/google/connect', {
@@ -172,7 +172,7 @@ export default function Integrations() {
 
     const initiateGoogleOAuth = () => {
         const clientId = currentUser?.google_client_id || googleClientId;
-        const redirectUri = window.location.origin + '/';
+        const redirectUri = window.location.origin;
         const scope = 'https://www.googleapis.com/auth/calendar.events';
         
         const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` + 
