@@ -29,6 +29,7 @@ import {
 } from './aria_service.js';
 import { checkAndSendReminders, startReminderService } from './reminder_service.js';
 import { startFollowupService } from './followup_service.js';
+import { exchangeCodeForTokens, getGoogleClientCredentials } from './google_calendar_service.js';
 
 dotenv.config({ path: '../.env' }); // Fallback to local .env if present
 
@@ -1076,6 +1077,101 @@ app.post('/api/integrations/cal/sync', async (req, res) => {
     } catch (err) {
         console.error('[Cal.com Sync API] Error:', err.message);
         res.status(500).json({ error: err.message || 'Sync failed' });
+    }
+});
+
+// POST /api/integrations/google/save-credentials
+app.post('/api/integrations/google/save-credentials', authenticateToken, async (req, res) => {
+    const { clientId, clientSecret } = req.body;
+    const userId = req.user.id;
+
+    if (!clientId || !clientSecret) {
+        return res.status(400).json({ error: "Client ID and Client Secret are required" });
+    }
+
+    try {
+        await pool.query(
+            `UPDATE public.users 
+             SET google_client_id = $1, google_client_secret = $2 
+             WHERE id = $3`,
+            [clientId.trim(), clientSecret.trim(), userId]
+        );
+        res.json({ success: true, message: "Google credentials saved successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/integrations/google/connect
+app.post('/api/integrations/google/connect', authenticateToken, async (req, res) => {
+    const { code, redirectUri } = req.body;
+    const userId = req.user.id;
+
+    if (!code || !redirectUri) {
+        return res.status(400).json({ error: "Auth code and redirect URI are required" });
+    }
+
+    try {
+        const credentials = await getGoogleClientCredentials(userId);
+        if (!credentials.clientId || !credentials.clientSecret) {
+            return res.status(400).json({ error: "Google OAuth credentials are not configured for this user." });
+        }
+
+        const tokens = await exchangeCodeForTokens(code, redirectUri, credentials);
+        const expiryDate = new Date(Date.now() + tokens.expires_in * 1000);
+
+        // Fetch calendar email address to link to connected status
+        const calRes = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary", {
+            headers: {
+                "Authorization": `Bearer ${tokens.access_token}`
+            }
+        });
+
+        let calendarEmail = 'Connected Account';
+        if (calRes.ok) {
+            const calData = await calRes.json();
+            if (calData.id) {
+                calendarEmail = calData.id;
+            }
+        }
+
+        // Save tokens in database (refresh_token might not be present if not first consent)
+        if (tokens.refresh_token) {
+            await pool.query(
+                `UPDATE public.users 
+                 SET google_access_token = $1, google_refresh_token = $2, google_token_expiry = $3, google_meet_link = $4
+                 WHERE id = $5`,
+                [tokens.access_token, tokens.refresh_token, expiryDate.toISOString(), calendarEmail, userId]
+            );
+        } else {
+            await pool.query(
+                `UPDATE public.users 
+                 SET google_access_token = $1, google_token_expiry = $2, google_meet_link = $3
+                 WHERE id = $4`,
+                [tokens.access_token, expiryDate.toISOString(), calendarEmail, userId]
+            );
+        }
+
+        res.json({ success: true, email: calendarEmail });
+    } catch (err) {
+        console.error("[Google Connect Route] Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/integrations/google/disconnect
+app.post('/api/integrations/google/disconnect', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        await pool.query(
+            `UPDATE public.users 
+             SET google_access_token = NULL, google_refresh_token = NULL, google_token_expiry = NULL, google_meet_link = NULL
+             WHERE id = $1`,
+            [userId]
+        );
+        res.json({ success: true, message: "Google Calendar disconnected successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

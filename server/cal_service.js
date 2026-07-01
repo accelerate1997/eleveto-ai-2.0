@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import pool from './db.js';
+import { createGoogleCalendarEvent } from './google_calendar_service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../.env') });
@@ -70,14 +71,27 @@ export async function createBooking(bookingData) {
     console.log(`[Custom Booking Engine] Creating booking template for ${bookingData.name} at ${bookingData.start}...`);
     
     let meetingLink = '';
+    let googleEventId = '';
+    let usedGoogleMeet = false;
+
     try {
-        const ownerRes = await pool.query("SELECT google_meet_link FROM public.users WHERE role = 'owner' LIMIT 1");
-        if (ownerRes.rows.length > 0 && ownerRes.rows[0].google_meet_link) {
-            meetingLink = ownerRes.rows[0].google_meet_link.trim();
-            console.log(`[Custom Booking Engine] Using owner's static Google Meet link: ${meetingLink}`);
+        const ownerRes = await pool.query("SELECT id, google_refresh_token, google_meet_link FROM public.users WHERE role = 'owner' LIMIT 1");
+        if (ownerRes.rows.length > 0) {
+            const owner = ownerRes.rows[0];
+            if (owner.google_refresh_token) {
+                console.log(`[Custom Booking Engine] Google Calendar linked. Creating calendar event...`);
+                const googleEvent = await createGoogleCalendarEvent(owner.id, bookingData);
+                meetingLink = googleEvent.meetLink;
+                googleEventId = googleEvent.id;
+                usedGoogleMeet = true;
+                console.log(`[Custom Booking Engine] Successfully created Google Meet link: ${meetingLink}`);
+            } else if (owner.google_meet_link) {
+                meetingLink = owner.google_meet_link.trim();
+                console.log(`[Custom Booking Engine] Google Calendar NOT linked. Using static Google Meet link: ${meetingLink}`);
+            }
         }
     } catch (err) {
-        console.warn(`[Custom Booking Engine] Failed to fetch owner's Google Meet link:`, err.message);
+        console.error(`[Custom Booking Engine] Failed to schedule Google Calendar event:`, err.message);
     }
 
     if (!meetingLink) {
@@ -99,6 +113,8 @@ export async function createBooking(bookingData) {
             startTime: bookingData.start,
             status: 'Scheduled',
             meetingUrl: meetingLink,
+            googleEventId: googleEventId,
+            usedGoogleMeet: usedGoogleMeet,
             attendees: [
                 {
                     name: bookingData.name,

@@ -98,6 +98,14 @@ function App() {
     });
   }, []);
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      setView('integrations');
+    }
+  }, []);
+
   // Close sidebar on resize to desktop
   useEffect(() => {
     const handler = () => {

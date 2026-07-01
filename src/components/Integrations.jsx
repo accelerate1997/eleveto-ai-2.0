@@ -3,7 +3,6 @@ import { pb } from '../lib/pocketbase';
 import { Settings, Calendar, Video, Plug, CheckCircle, ExternalLink, RefreshCw, MessageSquare } from 'lucide-react';
 
 export default function Integrations() {
-    // Mock state for connection statuses until backend is ready
     const [connections, setConnections] = useState({
         google_calendar: {
             isConnected: false,
@@ -14,10 +13,6 @@ export default function Integrations() {
             isConnected: false,
             email: null
         },
-        cal_com: {
-            isConnected: false,
-            username: null
-        },
         whatsapp: {
             isConnected: false,
             instanceName: null,
@@ -27,36 +22,120 @@ export default function Integrations() {
 
     const [googleMeetInput, setGoogleMeetInput] = useState('');
     const [showMeetModal, setShowMeetModal] = useState(false);
+    
+    // Google OAuth credentials state
+    const [googleClientId, setGoogleClientId] = useState('');
+    const [googleClientSecret, setGoogleClientSecret] = useState('');
+    const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [whatsappQr, setWhatsappQr] = useState(null);
     const [whatsappStatus, setWhatsappStatus] = useState('DISCONNECTED');
 
     const [isConnecting, setIsConnecting] = useState(null); // stores which provider is currently connecting
 
+    // Load initial user settings
+    const fetchUserData = async () => {
+        try {
+            const userId = pb.authStore.model?.id;
+            if (userId) {
+                const user = await pb.collection('users').getOne(userId, {
+                    '$autoCancel': false
+                });
+                setCurrentUser(user);
+                
+                if (user?.google_client_id) {
+                    setGoogleClientId(user.google_client_id);
+                    setGoogleClientSecret(user.google_client_secret || '••••••••••••••••');
+                }
+
+                // If Google Calendar is linked (has a refresh token)
+                if (user?.google_refresh_token) {
+                    setConnections(prev => ({
+                        ...prev,
+                        google_calendar: {
+                            isConnected: true,
+                            email: user.google_meet_link || 'Connected Account',
+                            lastSynced: user.google_token_expiry
+                        },
+                        google_meet: {
+                            isConnected: true,
+                            email: user.google_meet_link || 'Connected Account'
+                        }
+                    }));
+                } else if (user?.google_meet_link) {
+                    // Fallback to static link if present but not fully OAuth'ed
+                    setGoogleMeetInput(user.google_meet_link);
+                    setConnections(prev => ({
+                        ...prev,
+                        google_meet: {
+                            isConnected: true,
+                            email: user.google_meet_link
+                        }
+                    }));
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch user integrations:", err);
+        }
+    };
+
     useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                const userId = pb.authStore.model?.id;
-                if (userId) {
-                    const user = await pb.collection('users').getOne(userId, {
-                        '$autoCancel': false
+        fetchUserData();
+    }, []);
+
+    // Intercept Google OAuth Callback Code
+    useEffect(() => {
+        const handleOAuthCallback = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            if (code) {
+                // Clear code parameter from URL so page refreshes don't re-trigger it
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                setIsConnecting('google_calendar');
+                try {
+                    const redirectUri = window.location.origin + '/';
+                    console.log(`[Integrations] Completing Google handshake with redirect: ${redirectUri}`);
+                    
+                    const response = await fetch('/api/integrations/google/connect', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${pb.authStore.token}`
+                        },
+                        body: JSON.stringify({ code, redirectUri })
                     });
-                    if (user?.google_meet_link) {
-                        setGoogleMeetInput(user.google_meet_link);
+                    
+                    const data = await response.json();
+                    if (response.ok && data.success) {
                         setConnections(prev => ({
                             ...prev,
+                            google_calendar: {
+                                isConnected: true,
+                                email: data.email,
+                                lastSynced: new Date().toISOString()
+                            },
                             google_meet: {
                                 isConnected: true,
-                                email: user.google_meet_link
+                                email: data.email
                             }
                         }));
+                        alert(`Successfully connected Google Calendar/Meet: ${data.email}`);
+                        await fetchUserData(); // reload user
+                    } else {
+                        throw new Error(data.error || 'Google connection failed');
                     }
+                } catch (err) {
+                    console.error("Google OAuth handshake failed:", err);
+                    alert("Failed to connect Google Calendar: " + err.message);
+                } finally {
+                    setIsConnecting(null);
                 }
-            } catch (err) {
-                console.error("Failed to fetch user integrations:", err);
             }
         };
-        fetchUserData();
+        handleOAuthCallback();
     }, []);
 
     const handleConnect = (provider) => {
@@ -64,9 +143,20 @@ export default function Integrations() {
             setShowMeetModal(true);
             return;
         }
-        setIsConnecting(provider);
 
-        // Simulate OAuth flow delay
+        if (provider === 'google_calendar') {
+            // Check if user has saved credentials
+            const hasCredentials = currentUser?.google_client_id || googleClientId;
+            if (!hasCredentials) {
+                setShowCredentialsModal(true);
+            } else {
+                // Start OAuth Redirection
+                initiateGoogleOAuth();
+            }
+            return;
+        }
+
+        setIsConnecting(provider);
         setTimeout(() => {
             setConnections(prev => ({
                 ...prev,
@@ -78,6 +168,57 @@ export default function Integrations() {
             }));
             setIsConnecting(null);
         }, 1500);
+    };
+
+    const initiateGoogleOAuth = () => {
+        const clientId = currentUser?.google_client_id || googleClientId;
+        const redirectUri = window.location.origin + '/';
+        const scope = 'https://www.googleapis.com/auth/calendar.events';
+        
+        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` + 
+            `client_id=${encodeURIComponent(clientId)}&` + 
+            `redirect_uri=${encodeURIComponent(redirectUri)}&` + 
+            `response_type=code&` + 
+            `scope=${encodeURIComponent(scope)}&` + 
+            `access_type=offline&` + 
+            `prompt=consent`;
+
+        console.log(`[Google OAuth] Redirecting to: ${oauthUrl}`);
+        window.location.href = oauthUrl;
+    };
+
+    const handleCredentialsSubmit = async (e) => {
+        e.preventDefault();
+        setIsConnecting('google_calendar');
+        try {
+            const response = await fetch('/api/integrations/google/save-credentials', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${pb.authStore.token}`
+                },
+                body: JSON.stringify({
+                    clientId: googleClientId,
+                    clientSecret: googleClientSecret
+                })
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                alert("Google Client Credentials saved successfully!");
+                setShowCredentialsModal(false);
+                await fetchUserData(); // reload user
+                
+                // Immediately kick-off OAuth flow
+                initiateGoogleOAuth();
+            } else {
+                throw new Error(data.error || 'Failed to save credentials');
+            }
+        } catch (err) {
+            console.error("Save credentials failed:", err);
+            alert("Error saving credentials: " + err.message);
+        } finally {
+            setIsConnecting(null);
+        }
     };
 
     const handleMeetSubmit = async (e) => {
@@ -170,28 +311,42 @@ export default function Integrations() {
 
     const handleDisconnect = async (provider) => {
         if (window.confirm('Are you sure you want to disconnect this integration?')) {
+            setIsConnecting(provider);
             try {
-                const userId = pb.authStore.model?.id;
-                if (userId) {
-                    if (provider === 'google_meet') {
-                        await pb.collection('users').update(userId, {
-                            google_meet_link: ''
-                        });
+                if (provider === 'google_calendar' || provider === 'google_meet') {
+                    const response = await fetch('/api/integrations/google/disconnect', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${pb.authStore.token}`
+                        }
+                    });
+                    if (response.ok) {
                         setGoogleMeetInput('');
+                        setConnections(prev => ({
+                            ...prev,
+                            google_calendar: {
+                                isConnected: false,
+                                email: null,
+                                lastSynced: null
+                            },
+                            google_meet: {
+                                isConnected: false,
+                                email: null
+                            }
+                        }));
+                        alert("Google account disconnected successfully.");
+                        await fetchUserData(); // reload user
+                    } else {
+                        const err = await response.json();
+                        throw new Error(err.error || 'Disconnect failed');
                     }
                 }
             } catch (err) {
                 console.error(`Failed to clear ${provider} integration:`, err);
+                alert(`Failed to disconnect: ${err.message}`);
+            } finally {
+                setIsConnecting(null);
             }
-            setConnections(prev => ({
-                ...prev,
-                [provider]: {
-                    isConnected: false,
-                    email: null,
-                    lastSynced: null,
-                    username: null
-                }
-            }));
         }
     };
 
@@ -336,6 +491,89 @@ export default function Integrations() {
                                         }}
                                     >
                                         {isConnecting ? 'Saving...' : 'Save Link'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {showCredentialsModal && (
+                    <div style={{
+                        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(8px)',
+                        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+                    }}>
+                        <div style={{
+                            background: 'white', borderRadius: '24px', width: '100%', maxWidth: '500px',
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.1)', overflow: 'hidden', padding: '2rem'
+                        }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Configure Google OAuth</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+                                Enter your Google Cloud Client Credentials. Ensure your App's Authorized Redirect URIs in Google Cloud Console include: <code style={{ background: 'var(--neural-bg)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>{window.location.origin}/</code>
+                            </p>
+                            <form onSubmit={handleCredentialsSubmit}>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                                        Google Client ID
+                                    </label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="123456789-abc.apps.googleusercontent.com"
+                                        value={googleClientId}
+                                        onChange={e => setGoogleClientId(e.target.value)}
+                                        style={{
+                                            width: '100%', padding: '0.875rem', borderRadius: '12px',
+                                            border: '1px solid rgba(0,0,0,0.08)', background: 'var(--neural-bg)',
+                                            fontSize: '0.9rem', outline: 'none',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onFocus={e => e.target.style.borderColor = 'var(--primary-indigo)'}
+                                        onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.08)'}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                                        Google Client Secret
+                                    </label>
+                                    <input
+                                        required
+                                        type="password"
+                                        placeholder="GOCSPX-..."
+                                        value={googleClientSecret}
+                                        onChange={e => setGoogleClientSecret(e.target.value)}
+                                        style={{
+                                            width: '100%', padding: '0.875rem', borderRadius: '12px',
+                                            border: '1px solid rgba(0,0,0,0.08)', background: 'var(--neural-bg)',
+                                            fontSize: '0.9rem', outline: 'none',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onFocus={e => e.target.style.borderColor = 'var(--primary-indigo)'}
+                                        onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.08)'}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCredentialsModal(false)}
+                                        style={{
+                                            flex: 1, padding: '0.875rem', borderRadius: '12px',
+                                            border: '1px solid rgba(0,0,0,0.08)', background: 'white',
+                                            fontWeight: 700, cursor: 'pointer'
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        style={{
+                                            flex: 1, padding: '0.875rem', borderRadius: '12px',
+                                            border: 'none', background: 'var(--gradient-indigo)',
+                                            color: 'white', fontWeight: 700, cursor: 'pointer',
+                                            boxShadow: '0 8px 16px rgba(79, 70, 229, 0.2)'
+                                        }}
+                                    >
+                                        {isConnecting === 'google_calendar' ? 'Saving...' : 'Save & Link'}
                                     </button>
                                 </div>
                             </form>

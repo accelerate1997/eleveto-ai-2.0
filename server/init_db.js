@@ -12,6 +12,11 @@ const DDL_STATEMENTS = [
         cal_api_key TEXT,
         cal_username TEXT,
         google_meet_link TEXT,
+        google_client_id TEXT,
+        google_client_secret TEXT,
+        google_access_token TEXT,
+        google_refresh_token TEXT,
+        google_token_expiry TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );`,
 
