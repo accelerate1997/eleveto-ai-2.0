@@ -162,7 +162,16 @@ export const pb = {
                     url = '/api/portfolios';
                 }
 
-                return await request(url);
+                const items = await request(url);
+                if (colName === 'bookings') {
+                    return items.map(b => ({
+                        ...b,
+                        expand: {
+                            lead_id: b.lead
+                        }
+                    }));
+                }
+                return items;
             },
 
             getList: async (page, perPage, queryOptions = {}) => {
@@ -185,8 +194,17 @@ export const pb = {
                 }
 
                 const items = await request(url);
+                let formatted = items;
+                if (colName === 'bookings') {
+                    formatted = items.map(b => ({
+                        ...b,
+                        expand: {
+                            lead_id: b.lead
+                        }
+                    }));
+                }
                 return {
-                    items,
+                    items: formatted,
                     totalItems: items.length,
                     page: 1,
                     perPage: 100

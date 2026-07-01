@@ -69,10 +69,25 @@ export async function getAvailableSlots(date) {
 export async function createBooking(bookingData) {
     console.log(`[Custom Booking Engine] Creating booking template for ${bookingData.name} at ${bookingData.start}...`);
     
-    const cleanName = bookingData.name.replace(/[^a-zA-Z0-9]/g, '-');
-    const randomSuffix = Math.random().toString(36).substring(2, 7);
-    const meetingId = `Eleveto-Strategy-${cleanName}-${randomSuffix}`;
-    const meetingLink = `https://meet.jit.si/${meetingId}`;
+    let meetingLink = '';
+    try {
+        const ownerRes = await pool.query("SELECT google_meet_link FROM public.users WHERE role = 'owner' LIMIT 1");
+        if (ownerRes.rows.length > 0 && ownerRes.rows[0].google_meet_link) {
+            meetingLink = ownerRes.rows[0].google_meet_link.trim();
+            console.log(`[Custom Booking Engine] Using owner's static Google Meet link: ${meetingLink}`);
+        }
+    } catch (err) {
+        console.warn(`[Custom Booking Engine] Failed to fetch owner's Google Meet link:`, err.message);
+    }
+
+    if (!meetingLink) {
+        const cleanName = bookingData.name.replace(/[^a-zA-Z0-9]/g, '-');
+        const randomSuffix = Math.random().toString(36).substring(2, 7);
+        const meetingId = `Eleveto-Strategy-${cleanName}-${randomSuffix}`;
+        meetingLink = `https://meet.jit.si/${meetingId}`;
+        console.log(`[Custom Booking Engine] Fallback to Jitsi Meet link: ${meetingLink}`);
+    }
+
     const bookingId = 'local-' + Math.random().toString(36).substring(2, 9);
 
     return {

@@ -366,7 +366,13 @@ app.delete('/api/leads/:id', authenticateToken, async (req, res) => {
 // GET /api/bookings
 app.get('/api/bookings', authenticateToken, async (req, res) => {
     try {
-        const queryRes = await pool.query('SELECT * FROM public.bookings ORDER BY date ASC');
+        const queryRes = await pool.query(`
+            SELECT b.*, 
+                   (SELECT json_build_object('id', l.id, 'name', l.name, 'email', l.email, 'whatsapp', l.whatsapp, 'status', l.status) 
+                    FROM public.leads l WHERE l.id = b.lead_id) as lead 
+            FROM public.bookings b 
+            ORDER BY b.date ASC
+        `);
         res.json(queryRes.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -617,7 +623,7 @@ app.delete('/api/invites/:id', authenticateToken, async (req, res) => {
 // GET /api/users
 app.get('/api/users', authenticateToken, async (req, res) => {
     try {
-        const queryRes = await pool.query('SELECT id, email, name, role, active, cal_api_key, cal_username, created_at FROM public.users ORDER BY name ASC');
+        const queryRes = await pool.query('SELECT id, email, name, role, active, cal_api_key, cal_username, google_meet_link, created_at FROM public.users ORDER BY name ASC');
         res.json(queryRes.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -628,7 +634,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 app.get('/api/users/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
-        const queryRes = await pool.query('SELECT id, email, name, role, active, cal_api_key, cal_username, created_at FROM public.users WHERE id = $1', [id]);
+        const queryRes = await pool.query('SELECT id, email, name, role, active, cal_api_key, cal_username, google_meet_link, created_at FROM public.users WHERE id = $1', [id]);
         const user = queryRes.rows[0];
         if (!user) return res.status(404).json({ error: 'User not found' });
         res.json(user);
@@ -648,7 +654,7 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
         let index = 1;
 
         const allowedFields = [
-            'name', 'email', 'role', 'active', 'cal_api_key', 'cal_username'
+            'name', 'email', 'role', 'active', 'cal_api_key', 'cal_username', 'google_meet_link'
         ];
 
         for (const [key, val] of Object.entries(body)) {
@@ -664,7 +670,7 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
         }
 
         values.push(id);
-        const queryStr = `UPDATE public.users SET ${updates.join(', ')} WHERE id = $${index} RETURNING id, email, name, role, active, cal_api_key, cal_username`;
+        const queryStr = `UPDATE public.users SET ${updates.join(', ')} WHERE id = $${index} RETURNING id, email, name, role, active, cal_api_key, cal_username, google_meet_link`;
         
         const queryRes = await pool.query(queryStr, values);
         const updatedUser = queryRes.rows[0];

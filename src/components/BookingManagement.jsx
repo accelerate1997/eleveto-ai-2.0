@@ -278,22 +278,6 @@ export default function BookingManagement() {
                     </button>
 
                     <button
-                        onClick={handleSyncCal}
-                        disabled={isSyncing || !calApiKey}
-                        title="Sync with Cal.com"
-                        style={{
-                            width: '44px', height: '44px', borderRadius: '12px',
-                            background: 'white', border: '1px solid rgba(0, 0, 0, 0.08)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: (isSyncing || !calApiKey) ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)',
-                            transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                            opacity: !calApiKey ? 0.5 : 1
-                        }}
-                    >
-                        <Calendar size={15} style={{ animation: isSyncing ? 'pulse 1.5s infinite' : 'none' }} />
-                    </button>
-
-                    <button
                         onClick={() => handleOpenSchedule()}
                         style={{
                             background: 'var(--gradient-indigo)', color: 'white',
@@ -307,29 +291,6 @@ export default function BookingManagement() {
                     >
                         Schedule Meeting
                     </button>
-
-                    {calUsername && (
-                        <a
-                            href={`https://cal.com/${calUsername}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            data-cal-link={calUsername}
-                            data-cal-config='{"layout":"month_view"}'
-                            style={{
-                                background: '#111827', color: 'white',
-                                padding: '0 1.5rem', height: '44px',
-                                borderRadius: '12px', fontWeight: 700, border: 'none',
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem',
-                                fontFamily: 'Inter, sans-serif', fontSize: '0.875rem',
-                                boxShadow: '0 8px 16px rgba(17, 24, 39, 0.2)',
-                                transition: 'all 0.3s',
-                                textDecoration: 'none'
-                            }}
-                        >
-                            <Calendar size={16} strokeWidth={3} />
-                            Book via Cal.com
-                        </a>
-                    )}
                 </div>
             </header>
 

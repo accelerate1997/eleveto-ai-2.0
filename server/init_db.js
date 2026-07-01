@@ -11,6 +11,7 @@ const DDL_STATEMENTS = [
         active BOOLEAN DEFAULT TRUE,
         cal_api_key TEXT,
         cal_username TEXT,
+        google_meet_link TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );`,
 

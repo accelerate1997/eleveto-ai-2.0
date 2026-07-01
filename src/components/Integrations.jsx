@@ -25,8 +25,8 @@ export default function Integrations() {
         }
     });
 
-    const [calApiKeyInput, setCalApiKeyInput] = useState('');
-    const [showCalModal, setShowCalModal] = useState(false);
+    const [googleMeetInput, setGoogleMeetInput] = useState('');
+    const [showMeetModal, setShowMeetModal] = useState(false);
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [whatsappQr, setWhatsappQr] = useState(null);
     const [whatsappStatus, setWhatsappStatus] = useState('DISCONNECTED');
@@ -41,15 +41,15 @@ export default function Integrations() {
                     const user = await pb.collection('users').getOne(userId, {
                         '$autoCancel': false
                     });
-                    if (user?.cal_api_key) {
+                    if (user?.google_meet_link) {
+                        setGoogleMeetInput(user.google_meet_link);
                         setConnections(prev => ({
                             ...prev,
-                            cal_com: {
+                            google_meet: {
                                 isConnected: true,
-                                username: 'Linked'
+                                email: user.google_meet_link
                             }
                         }));
-                        setCalApiKeyInput(user.cal_api_key);
                     }
                 }
             } catch (err) {
@@ -60,8 +60,8 @@ export default function Integrations() {
     }, []);
 
     const handleConnect = (provider) => {
-        if (provider === 'cal_com') {
-            setShowCalModal(true);
+        if (provider === 'google_meet') {
+            setShowMeetModal(true);
             return;
         }
         setIsConnecting(provider);
@@ -80,33 +80,33 @@ export default function Integrations() {
         }, 1500);
     };
 
-    const handleCalSubmit = async (e) => {
+    const handleMeetSubmit = async (e) => {
         e.preventDefault();
-        setIsConnecting('cal_com');
+        setIsConnecting('google_meet');
 
-        console.log("Integrations: Saving Cal.com API Key...");
+        console.log("Integrations: Saving Google Meet link...");
 
         try {
             const userId = pb.authStore.model?.id;
             if (userId) {
                 await pb.collection('users').update(userId, {
-                    cal_api_key: calApiKeyInput.trim()
+                    google_meet_link: googleMeetInput.trim()
                 });
-                console.log("Integrations: Saved API Key successfully");
+                console.log("Integrations: Saved Google Meet link successfully");
             }
 
             setConnections(prev => ({
                 ...prev,
-                cal_com: {
-                    isConnected: true,
-                    username: 'Linked with API Key'
+                google_meet: {
+                    isConnected: !!googleMeetInput.trim(),
+                    email: googleMeetInput.trim()
                 }
             }));
-            setShowCalModal(false);
-            alert("Cal.com API Key linked successfully!");
+            setShowMeetModal(false);
+            alert("Google Meet link linked successfully!");
         } catch (err) {
             console.error("Integrations: Save failed:", err);
-            alert('Failed to connect Cal.com: ' + err.message);
+            alert('Failed to connect Google Meet: ' + err.message);
         } finally {
             setIsConnecting(null);
         }
@@ -170,17 +170,18 @@ export default function Integrations() {
 
     const handleDisconnect = async (provider) => {
         if (window.confirm('Are you sure you want to disconnect this integration?')) {
-            if (provider === 'cal_com') {
-                try {
-                    const userId = pb.authStore.model?.id;
-                    if (userId) {
+            try {
+                const userId = pb.authStore.model?.id;
+                if (userId) {
+                    if (provider === 'google_meet') {
                         await pb.collection('users').update(userId, {
-                            cal_username: ''
+                            google_meet_link: ''
                         });
+                        setGoogleMeetInput('');
                     }
-                } catch (err) {
-                    console.error('Failed to clear cal_username:', err);
                 }
+            } catch (err) {
+                console.error(`Failed to clear ${provider} integration:`, err);
             }
             setConnections(prev => ({
                 ...prev,
@@ -244,20 +245,6 @@ export default function Integrations() {
                             color="#0f9d58"
                         />
 
-                        {/* Cal.com Card */}
-                        <IntegrationCard
-                            title="Cal.com"
-                            description="Embed your Cal.com scheduling page directly and sync bookings."
-                            icon={<Calendar size={24} color="#111827" />}
-                            connected={connections.cal_com.isConnected}
-                            email={connections.cal_com.username}
-                            lastSynced={null}
-                            isConnecting={isConnecting === 'cal_com'}
-                            onConnect={() => handleConnect('cal_com')}
-                            onDisconnect={() => handleDisconnect('cal_com')}
-                            color="#111827"
-                        />
-
                         {/* WhatsApp Card */}
                         <IntegrationCard
                             title="WhatsApp Business"
@@ -293,30 +280,30 @@ export default function Integrations() {
                     </div>
                 </section>
 
-                {showCalModal && (
+                {showMeetModal && (
                     <div style={{
                         position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(8px)',
                         zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
                     }}>
                         <div style={{
-                            background: 'white', borderRadius: '24px', width: '100%', maxWidth: '400px',
+                            background: 'white', borderRadius: '24px', width: '100%', maxWidth: '450px',
                             boxShadow: '0 20px 40px rgba(0,0,0,0.1)', overflow: 'hidden', padding: '2rem'
                         }}>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Connect Cal.com</h2>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Connect Google Meet</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                                Enter your Cal.com API Key to sync your real bookings and schedule meetings.
+                                Enter your personal Google Meet URL to automatically host client meetings in your personal meeting room.
                             </p>
-                            <form onSubmit={handleCalSubmit}>
+                            <form onSubmit={handleMeetSubmit}>
                                 <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                                     <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                                        Cal.com API Key
+                                        Personal Google Meet URL
                                     </label>
                                     <input
                                         required
-                                        type="password"
-                                        placeholder="cal_live_..."
-                                        value={calApiKeyInput}
-                                        onChange={e => setCalApiKeyInput(e.target.value)}
+                                        type="url"
+                                        placeholder="https://meet.google.com/abc-defg-hij"
+                                        value={googleMeetInput}
+                                        onChange={e => setGoogleMeetInput(e.target.value)}
                                         style={{
                                             width: '100%', padding: '0.875rem', borderRadius: '12px',
                                             border: '1px solid rgba(0,0,0,0.08)', background: 'var(--neural-bg)',
@@ -326,14 +313,11 @@ export default function Integrations() {
                                         onFocus={e => e.target.style.borderColor = 'var(--primary-indigo)'}
                                         onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.08)'}
                                     />
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                                        Find this in Cal.com &rarr; Settings &rarr; API Keys
-                                    </p>
                                 </div>
                                 <div style={{ display: 'flex', gap: '1rem' }}>
                                     <button
                                         type="button"
-                                        onClick={() => setShowCalModal(false)}
+                                        onClick={() => setShowMeetModal(false)}
                                         style={{
                                             flex: 1, padding: '0.875rem', borderRadius: '12px',
                                             border: '1px solid rgba(0,0,0,0.08)', background: 'white',
@@ -351,7 +335,7 @@ export default function Integrations() {
                                             boxShadow: '0 8px 16px rgba(79, 70, 229, 0.2)'
                                         }}
                                     >
-                                        {isConnecting ? 'Linking...' : 'Link API Key'}
+                                        {isConnecting ? 'Saving...' : 'Save Link'}
                                     </button>
                                 </div>
                             </form>
