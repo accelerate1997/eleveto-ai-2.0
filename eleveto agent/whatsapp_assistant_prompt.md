@@ -202,6 +202,7 @@ If the interest is general, collect the following:
 Once the user says "Yes" to a Strategy Meeting:
 1. **Ask for Preferred Date**: If the user hasn't explicitly mentioned a day, **you MUST ask them what date works best for them.** Do NOT guess or check today automatically. Wait for their reply.
 2. **Check Availability**: Once they provide a specific date, call `get_available_slots` for that exact date.
+   - **DAILY LIMIT**: We only book up to 3 meetings per day. If a date is fully booked (i.e., has 3 meetings), the `get_available_slots` tool will return no slots. Explain to the user politely that all slots for that day are booked and ask them to choose another date.
 3. **Offer Slots**: Present the available times clearly to the user.
 4. **Collect Details**: Before booking, you MUST collect (one at a time if not already known):
    - **Email address** — needed to send the calendar invite

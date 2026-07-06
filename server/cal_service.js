@@ -44,6 +44,12 @@ export async function getAvailableSlots(date) {
     `;
     const dbRes = await pool.query(query, [dayStart, dayEnd]);
 
+    // Check if the daily booking limit (3) has been reached
+    if (dbRes.rows.length >= 3) {
+        console.log(`[Custom Booking Engine] Daily meeting limit (3) reached for ${date}. Returning 0 available slots.`);
+        return [];
+    }
+
     // 3. Filter out slots that overlap with any existing booking
     const availableSlots = possibleSlots.filter(slot => {
         const slotStartMs = new Date(slot).getTime();
@@ -70,6 +76,31 @@ export async function getAvailableSlots(date) {
 export async function createBooking(bookingData) {
     console.log(`[Custom Booking Engine] Creating booking template for ${bookingData.name} at ${bookingData.start}...`);
     
+    // Check daily booking limit of 3 meetings
+    const dateObj = new Date(bookingData.start);
+    const tzOffset = 5.5 * 60 * 60 * 1000; // IST offset is +5.5 hours
+    const istDate = new Date(dateObj.getTime() + tzOffset);
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+    const dateInIST = `${year}-${month}-${day}`;
+
+    const dayStart = new Date(`${dateInIST}T00:00:00+05:30`).toISOString();
+    const dayEnd = new Date(`${dateInIST}T23:59:59+05:30`).toISOString();
+
+    const limitQuery = `
+        SELECT COUNT(*) as count 
+        FROM public.bookings 
+        WHERE status != 'Cancelled' 
+          AND date >= $1 
+          AND date <= $2
+    `;
+    const limitRes = await pool.query(limitQuery, [dayStart, dayEnd]);
+    const activeCount = parseInt(limitRes.rows[0].count, 10);
+    if (activeCount >= 3) {
+        throw new Error(`Daily booking limit reached. Only 3 meetings are allowed per day.`);
+    }
+
     let meetingLink = '';
     let googleEventId = '';
     let usedGoogleMeet = false;
