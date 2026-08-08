@@ -716,7 +716,7 @@ function IntegrationCard({ title, description, icon, connected, email, lastSynce
                         </button>
                         <button
                             style={{
-                                flex: 1, padding: '0.75rem', border: 'none', background: 'var(--neural-bg)',
+                                flex: 1, padding: '0.75rem', background: 'var(--neural-bg)',
                                 borderRadius: '12px', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.875rem',
                                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                                 border: '1px solid rgba(0,0,0,0.05)'
