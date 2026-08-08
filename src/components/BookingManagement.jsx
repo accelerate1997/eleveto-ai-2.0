@@ -98,10 +98,14 @@ export default function BookingManagement() {
     const handleOpenSchedule = (booking = null) => {
         if (booking) {
             const dateObj = new Date(booking.date);
-            // Format YYYY-MM-DD
-            const d = dateObj.toISOString().split('T')[0];
-            // Format HH:MM
-            const t = dateObj.toTimeString().split(' ')[0].substring(0, 5);
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const hours = String(dateObj.getHours()).padStart(2, '0');
+            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+
+            const d = `${year}-${month}-${day}`;
+            const t = `${hours}:${minutes}`;
 
             setFormData({
                 lead_id: booking.lead_id,
@@ -115,10 +119,15 @@ export default function BookingManagement() {
             });
             setSelectedBooking(booking);
         } else {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+
             setFormData({
                 lead_id: '',
                 title: 'Discovery Call',
-                date: new Date().toISOString().split('T')[0],
+                date: `${year}-${month}-${day}`,
                 time: '10:00',
                 duration: 30,
                 status: 'Scheduled',
@@ -138,8 +147,9 @@ export default function BookingManagement() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Combine date and time
-            const dateTimeString = `${formData.date}T${formData.time}:00Z`;
+            // Combine date and time in user's local timezone, then convert to ISO string
+            const localDate = new Date(`${formData.date}T${formData.time}:00`);
+            const dateTimeString = localDate.toISOString();
 
             const data = {
                 title: formData.title,
