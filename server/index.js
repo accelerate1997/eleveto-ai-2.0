@@ -30,6 +30,7 @@ import {
 import { checkAndSendReminders, startReminderService } from './reminder_service.js';
 import { startFollowupService } from './followup_service.js';
 import { exchangeCodeForTokens, getGoogleClientCredentials } from './google_calendar_service.js';
+import { getAvailableSlots, createBooking } from './cal_service.js';
 
 dotenv.config({ path: '../.env' }); // Fallback to local .env if present
 
@@ -360,6 +361,178 @@ app.delete('/api/leads/:id', authenticateToken, async (req, res) => {
 
 /**
  * ─────────────────────────────────────────────────
+ *  PUBLIC BOOKINGS ENDPOINTS (No Auth Required)
+ * ─────────────────────────────────────────────────
+ */
+
+// GET /api/public/slots - Get available slots for a specific date
+app.get('/api/public/slots', async (req, res) => {
+    const { date } = req.query; // YYYY-MM-DD
+    if (!date) {
+        return res.status(400).json({ error: 'date query parameter is required (YYYY-MM-DD)' });
+    }
+    try {
+        const slots = await getAvailableSlots(date);
+        res.json(slots);
+    } catch (err) {
+        console.error('[Public API] Error getting slots:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/public/bookings - Book a new meeting
+app.post('/api/public/bookings', async (req, res) => {
+    const { name, email, phone, start, notes } = req.body;
+    if (!name || !email || !phone || !start) {
+        return res.status(400).json({ error: 'name, email, phone, and start are required.' });
+    }
+
+    try {
+        // Normalize phone number (digits only)
+        let normalizedPhone = phone.replace(/\D/g, '');
+        if (normalizedPhone.length === 10) {
+            normalizedPhone = '91' + normalizedPhone;
+        }
+        
+        let leadId = null;
+        let leadRes = await pool.query(
+            'SELECT * FROM public.leads WHERE whatsapp = $1 OR (email = $2 AND email IS NOT NULL AND email != \'\') LIMIT 1',
+            [normalizedPhone, email.toLowerCase().trim()]
+        );
+
+        let lead = leadRes.rows[0];
+        if (lead) {
+            leadId = lead.id;
+            let updateFields = [];
+            let updateValues = [];
+            let index = 1;
+
+            if (!lead.email && email) {
+                updateFields.push(`email = $${index++}`);
+                updateValues.push(email.toLowerCase().trim());
+            }
+            if (!lead.name && name) {
+                updateFields.push(`name = $${index++}`);
+                updateValues.push(name.trim());
+            }
+
+            if (updateFields.length > 0) {
+                updateValues.push(leadId);
+                await pool.query(
+                    `UPDATE public.leads SET ${updateFields.join(', ')} WHERE id = $${index}`,
+                    updateValues
+                );
+                console.log(`[Public Booking] Updated existing lead fields: ${updateFields.join(', ')}`);
+            }
+        } else {
+            // Create new lead
+            const insertLeadRes = await pool.query(
+                `INSERT INTO public.leads (name, email, whatsapp, status, source, notes) 
+                 VALUES ($1, $2, $3, 'Lead', 'Self Booking Page', $4) 
+                 RETURNING *`,
+                [
+                    name.trim(),
+                    email.toLowerCase().trim(),
+                    normalizedPhone,
+                    notes || 'Created via self-booking page'
+                ]
+            );
+            lead = insertLeadRes.rows[0];
+            leadId = lead.id;
+            console.log(`[Public Booking] Created new lead for ${name} (ID: ${leadId})`);
+            broadcast('leads:create', lead);
+        }
+
+        // Call the calendar service engine
+        const bookingResult = await createBooking({
+            name: name.trim(),
+            email: email.toLowerCase().trim(),
+            phone: phone.trim(),
+            start: start
+        });
+
+        // Save booking to public.bookings
+        const b = bookingResult.booking || bookingResult.data || bookingResult;
+        const bookingId = b.id || b.uid || 'N/A';
+        const bookingUid = b.uid || '';
+        const videoCallUrl = b.meetingUrl || b.metadata?.videoCallUrl || b.videoCallUrl || '';
+        const rescheduleUrl = bookingUid ? `https://cal.com/reschedule/${bookingUid}` : '';
+
+        const insertBookingQuery = `
+            INSERT INTO public.bookings (title, date, duration, status, notes, reschedule_link, lead_id, meeting_link, reminders_sent)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING *
+        `;
+        const bValues = [
+            `Strategy Meeting with ${name.trim()}`,
+            start,
+            30,
+            'Scheduled',
+            notes || `Booked via website self-booking page (ID: ${bookingId})`,
+            rescheduleUrl,
+            leadId,
+            videoCallUrl,
+            JSON.stringify([])
+        ];
+
+        const bRes = await pool.query(insertBookingQuery, bValues);
+        const newBooking = bRes.rows[0];
+        
+        // Attach lead object for dashboard compatibility
+        newBooking.lead = {
+            id: lead.id,
+            name: lead.name,
+            email: lead.email,
+            whatsapp: lead.whatsapp,
+            status: lead.status
+        };
+
+        console.log(`[Public Booking] Booking saved and linked to lead (ID: ${newBooking.id})`);
+        
+        // Broadcast
+        broadcast('bookings:create', newBooking);
+
+        // Send WhatsApp confirmation message to the lead
+        try {
+            const formattedTime = new Date(start).toLocaleString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                dateStyle: 'full',
+                timeStyle: 'short'
+            });
+
+            const confirmationText = `✅ *Meeting Confirmed!*
+ 
+Hi ${name.trim()}, your Strategy Meeting is booked.
+ 
+📅 *Date:* ${formattedTime}
+🔗 *Meeting Link:* ${videoCallUrl || 'Coming soon to your calendar'}
+🔄 *Reschedule:* ${rescheduleUrl || 'Check your email'}
+
+*What’s Next?*
+1. Check your email for the calendar invite.
+2. I will send you reminders 24h, 1h, and 10 mins before we start! 👋`;
+
+            const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
+            await sendWhatsAppMessage(normalizedPhone, confirmationText, instanceName);
+            console.log(`[Public Booking] WhatsApp confirmation sent successfully to ${normalizedPhone}`);
+        } catch (waErr) {
+            console.error(`[Public Booking] Failed to send WhatsApp confirmation:`, waErr.message);
+        }
+
+        res.status(201).json({
+            success: true,
+            booking: newBooking,
+            meetingLink: videoCallUrl,
+            rescheduleLink: rescheduleUrl
+        });
+    } catch (err) {
+        console.error('[Public API] Error creating booking:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * ─────────────────────────────────────────────────
  *  BOOKINGS ENDPOINTS
  * ─────────────────────────────────────────────────
  */
@@ -386,6 +559,32 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
     if (!title || !date) return res.status(400).json({ error: 'title and date are required' });
 
     try {
+        let finalMeetingLink = meeting_link ? meeting_link.trim() : '';
+        let leadObj = null;
+
+        if (lead_id) {
+            const leadRes = await pool.query('SELECT * FROM public.leads WHERE id = $1', [lead_id]);
+            if (leadRes.rows.length > 0) {
+                leadObj = leadRes.rows[0];
+            }
+        }
+
+        // If meeting_link is empty, automatically generate Google Meet / Jitsi link
+        if (!finalMeetingLink) {
+            try {
+                const bookingResult = await createBooking({
+                    name: leadObj ? leadObj.name : (title || 'Client'),
+                    email: leadObj ? (leadObj.email || '') : '',
+                    phone: leadObj ? (leadObj.whatsapp || '') : '',
+                    start: date
+                });
+                const b = bookingResult.booking || bookingResult.data || bookingResult;
+                finalMeetingLink = b.meetingUrl || b.metadata?.videoCallUrl || b.videoCallUrl || '';
+            } catch (calErr) {
+                console.error('[POST /api/bookings] Error auto-generating meeting link:', calErr.message);
+            }
+        }
+
         const insertQuery = `
             INSERT INTO public.bookings (title, date, duration, status, notes, meeting_link, reschedule_link, lead_id, reminders_sent)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -393,15 +592,65 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
         `;
         const values = [
             title, date, duration || 30, status || 'Scheduled', 
-            notes || '', meeting_link || '', reschedule_link || '', 
+            notes || '', finalMeetingLink, reschedule_link || '', 
             lead_id || null, JSON.stringify([])
         ];
 
         const queryRes = await pool.query(insertQuery, values);
         const booking = queryRes.rows[0];
+
+        // Send confirmation WhatsApp message if lead has a phone number
+        if (leadObj && leadObj.whatsapp) {
+            try {
+                let normalizedPhone = leadObj.whatsapp.replace(/[^0-9]/g, '');
+                if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
+
+                const formattedTime = new Date(date).toLocaleString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    dateStyle: 'full',
+                    timeStyle: 'short'
+                });
+
+                const confirmationText = `✅ *Meeting Confirmed!*
+
+Hi ${leadObj.name.trim()}, your meeting "${title}" has been scheduled.
+
+📅 *Date & Time:* ${formattedTime}
+🔗 *Meeting Link:* ${finalMeetingLink || 'Will be shared shortly'}
+
+*What’s Next?*
+1. Please join using the link above at the scheduled time.
+2. We will send you reminder updates prior to the meeting! 👋`;
+
+                const instanceName = process.env.INSTANCE_NAME || 'Eleveto_gx3yachgic1mjxv';
+                await sendWhatsAppMessage(normalizedPhone, confirmationText, instanceName);
+                console.log(`[POST /api/bookings] WhatsApp confirmation sent successfully to ${normalizedPhone}`);
+            } catch (waErr) {
+                console.error(`[POST /api/bookings] Failed to send WhatsApp confirmation:`, waErr.message);
+            }
+
+            // Update lead status to 'Meeting Booked'
+            try {
+                await pool.query("UPDATE public.leads SET status = 'Meeting Booked' WHERE id = $1", [lead_id]);
+            } catch (stErr) {
+                console.error(`[POST /api/bookings] Failed to update lead status:`, stErr.message);
+            }
+        }
+
+        if (leadObj) {
+            booking.lead = {
+                id: leadObj.id,
+                name: leadObj.name,
+                email: leadObj.email,
+                whatsapp: leadObj.whatsapp,
+                status: 'Meeting Booked'
+            };
+        }
+
         broadcast('bookings:create', booking);
         res.status(201).json(booking);
     } catch (err) {
+        console.error('[POST /api/bookings] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

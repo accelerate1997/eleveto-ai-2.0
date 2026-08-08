@@ -116,7 +116,7 @@ export async function createBooking(bookingData) {
                 googleEventId = googleEvent.id;
                 usedGoogleMeet = true;
                 console.log(`[Custom Booking Engine] Successfully created Google Meet link: ${meetingLink}`);
-            } else if (owner.google_meet_link) {
+            } else if (owner.google_meet_link && owner.google_meet_link.startsWith('http')) {
                 meetingLink = owner.google_meet_link.trim();
                 console.log(`[Custom Booking Engine] Google Calendar NOT linked. Using static Google Meet link: ${meetingLink}`);
             }

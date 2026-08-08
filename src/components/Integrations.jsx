@@ -509,7 +509,7 @@ export default function Integrations() {
                         }}>
                             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Configure Google OAuth</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-                                Enter your Google Cloud Client Credentials. Ensure your App's Authorized Redirect URIs in Google Cloud Console include: <code style={{ background: 'var(--neural-bg)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>{window.location.origin}/</code>
+                                Enter your Google Cloud Client Credentials. Ensure your App's Authorized Redirect URIs in Google Cloud Console include: <code style={{ background: 'var(--neural-bg)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>{window.location.origin}</code>
                             </p>
                             <form onSubmit={handleCredentialsSubmit}>
                                 <div className="form-group" style={{ marginBottom: '1rem' }}>

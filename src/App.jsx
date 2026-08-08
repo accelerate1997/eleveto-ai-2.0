@@ -11,6 +11,7 @@ import EmployeesManager from './components/EmployeesManager';
 import PortfolioManagement from './components/PortfolioManagement';
 import SequenceBuilder from './components/SequenceBuilder';
 import LeadDetailsPage from './components/LeadDetailsPage';
+import SelfBookingPage from './components/SelfBookingPage';
 import { Kanban, Zap, Users, LogOut, ChevronRight, Boxes, Activity, Menu, X, Calendar, Plug, ShieldCheck, Briefcase, ListOrdered } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -125,8 +126,14 @@ function App() {
     setSidebarOpen(false); // close drawer on mobile after nav
   };
 
+  const params = new URLSearchParams(window.location.search);
+  const isBookingMode = params.get('book') === 'true';
+
+  if (isBookingMode) {
+    return <SelfBookingPage onBackToHome={() => window.location.href = '/'} />;
+  }
+
   if (!user) {
-    const params = new URLSearchParams(window.location.search);
     const isLoginMode = params.get('login') === 'true';
     const hasInvite = params.get('invite') !== null;
 
@@ -134,7 +141,12 @@ function App() {
       return <AuthForm />;
     }
 
-    return <LandingPage onLoginClick={() => window.location.href = '/?login=true'} />;
+    return (
+      <LandingPage 
+        onLoginClick={() => window.location.href = '/?login=true'} 
+        onBookClick={() => window.location.href = '/?book=true'} 
+      />
+    );
   }
 
   const renderSidebarContent = () => (

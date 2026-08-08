@@ -507,7 +507,8 @@ export async function sendWhatsAppMessage(remoteJid, text, instanceName) {
             console.log(`[Aria] ✅ Sent reply to ${cleanNumber}`);
             return true;
         }
-        console.error(`[Aria] ❌ Failed to send. Status: ${response.status}`);
+        const errText = await response.text();
+        console.error(`[Aria] ❌ Failed to send. Status: ${response.status}. Body: ${errText}`);
         return false;
     } catch (err) {
         console.error('[Aria] ❌ Send error:', err.message);

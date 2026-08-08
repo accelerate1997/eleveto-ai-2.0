@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 
-const LandingPage = ({ onLoginClick }) => {
+const LandingPage = ({ onLoginClick, onBookClick }) => {
     const [scrolled, setScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [activeFaq, setActiveFaq] = useState(null);
@@ -336,8 +336,8 @@ const LandingPage = ({ onLoginClick }) => {
                     <button onClick={onLoginClick} className="btn-ghost" style={{ padding: '0.6rem 1.25rem', fontSize: '0.875rem' }}>
                         Client Portal
                     </button>
-                    <button onClick={onLoginClick} className="btn-primary" style={{ padding: '0.7rem 1.4rem', fontSize: '0.875rem' }}>
-                        Start a Project <ArrowRight size={16} />
+                    <button onClick={onBookClick} className="btn-primary" style={{ padding: '0.7rem 1.4rem', fontSize: '0.875rem' }}>
+                        Book a Call <ArrowRight size={16} />
                     </button>
                 </div>
 
@@ -364,8 +364,8 @@ const LandingPage = ({ onLoginClick }) => {
                             </a>
                         ))}
                     </div>
-                    <button onClick={() => { setIsMenuOpen(false); onLoginClick(); }} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1.25rem' }}>
-                        Start a Project <ArrowRight size={20} />
+                    <button onClick={() => { setIsMenuOpen(false); onBookClick(); }} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1.25rem' }}>
+                        Book a Call <ArrowRight size={20} />
                     </button>
                 </div>
             )}
@@ -403,8 +403,8 @@ const LandingPage = ({ onLoginClick }) => {
                     </p>
 
                     <div className="hero-animate-4 hero-btns" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <button onClick={onLoginClick} className="btn-primary" style={{ padding: '1.1rem 2.25rem', fontSize: '1rem' }}>
-                            Start a Project <ArrowRight size={18} />
+                        <button onClick={onBookClick} className="btn-primary" style={{ padding: '1.1rem 2.25rem', fontSize: '1rem' }}>
+                            Book a Call <ArrowRight size={18} />
                         </button>
                         <a href="#portfolio" className="btn-ghost" style={{ padding: '1.1rem 2.25rem', fontSize: '1rem', textDecoration: 'none' }}>
                             <Play size={16} style={{ color: '#6366f1' }} /> See Our Work
@@ -699,8 +699,8 @@ const LandingPage = ({ onLoginClick }) => {
                             <p style={{ color: 'rgba(148,163,184,0.8)', fontSize: '1.05rem', lineHeight: 1.8, marginBottom: '2.5rem' }}>
                                 We treat every project as an investment in your business. That means understanding your goals, challenging assumptions, and delivering something that actually performs.
                             </p>
-                            <button onClick={onLoginClick} className="btn-primary">
-                                Work With Us <ArrowRight size={18} />
+                            <button onClick={onBookClick} className="btn-primary">
+                                Book a Call <ArrowRight size={18} />
                             </button>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -779,8 +779,8 @@ const LandingPage = ({ onLoginClick }) => {
                             Whether you have a clear brief or just an idea, we're happy to have a no-pressure conversation about what's possible. Let's figure it out together.
                         </p>
                         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                            <button onClick={onLoginClick} className="btn-primary" style={{ padding: '1.15rem 2.5rem', fontSize: '1rem' }}>
-                                Start a Project <ArrowRight size={18} />
+                            <button onClick={onBookClick} className="btn-primary" style={{ padding: '1.15rem 2.5rem', fontSize: '1rem' }}>
+                                Book a Call <ArrowRight size={18} />
                             </button>
                             <a href="mailto:hello@elevetoai.com" className="btn-ghost" style={{ padding: '1.15rem 2.5rem', fontSize: '1rem', textDecoration: 'none' }}>
                                 <Mail size={18} style={{ color: '#6366f1' }} /> Get in Touch
