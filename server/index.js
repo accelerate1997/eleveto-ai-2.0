@@ -959,6 +959,8 @@ app.get(['/api/Portoflio', '/api/portfolios'], async (req, res) => {
             id: p.id,
             project_name: p.project_name,
             Desicription_: p.description,
+            project_url: p.project_url || '',
+            project_link: p.project_url || '',
             Project_thumnail: p.project_thumbnail,
             project_images_: p.project_images,
             created: p.created_at
@@ -974,7 +976,8 @@ app.post(['/api/Portoflio', '/api/portfolios'], authenticateToken, upload.fields
     { name: 'Project_thumnail', maxCount: 1 },
     { name: 'project_images_', maxCount: 10 }
 ]), async (req, res) => {
-    const { project_name, Desicription_ } = req.body;
+    const { project_name, Desicription_, project_url, project_link, url } = req.body;
+    const finalUrl = (project_url || project_link || url || '').trim();
     if (!project_name) return res.status(400).json({ error: 'project_name is required' });
 
     try {
@@ -991,8 +994,8 @@ app.post(['/api/Portoflio', '/api/portfolios'], authenticateToken, upload.fields
         }
 
         const queryRes = await pool.query(
-            'INSERT INTO public.portfolios (project_name, description, project_images, project_thumbnail) VALUES ($1, $2, $3, $4) RETURNING *',
-            [project_name, Desicription_ || '', JSON.stringify(images), thumbnail]
+            'INSERT INTO public.portfolios (project_name, description, project_url, project_images, project_thumbnail) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [project_name, Desicription_ || '', finalUrl, JSON.stringify(images), thumbnail]
         );
         const p = queryRes.rows[0];
         
@@ -1001,7 +1004,65 @@ app.post(['/api/Portoflio', '/api/portfolios'], authenticateToken, upload.fields
             id: p.id,
             project_name: p.project_name,
             Desicription_: p.description,
+            project_url: p.project_url,
+            project_link: p.project_url,
             Project_thumnail: p.project_thumbnail,
+            project_images_: p.project_images,
+            created: p.created_at
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /api/Portoflio/:id (Update portfolio item)
+app.put(['/api/Portoflio/:id', '/api/portfolios/:id'], authenticateToken, upload.fields([
+    { name: 'Project_thumnail', maxCount: 1 },
+    { name: 'project_images_', maxCount: 10 }
+]), async (req, res) => {
+    const { id } = req.params;
+    const { project_name, Desicription_, project_url, project_link, url } = req.body;
+    const finalUrl = (project_url || project_link || url || '').trim();
+
+    try {
+        const existing = await pool.query('SELECT * FROM public.portfolios WHERE id = $1', [id]);
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ error: 'Portfolio item not found' });
+        }
+        const current = existing.rows[0];
+
+        let thumbnail = current.project_thumbnail;
+        if (req.files?.['Project_thumnail']?.[0]) {
+            thumbnail = req.files['Project_thumnail'][0].filename;
+        }
+
+        let images = Array.isArray(current.project_images) ? current.project_images : [];
+        if (req.files?.['project_images_'] && req.files['project_images_'].length > 0) {
+            const newImages = req.files['project_images_'].map(f => f.filename);
+            images = [...images, ...newImages];
+        }
+
+        const queryRes = await pool.query(
+            'UPDATE public.portfolios SET project_name = COALESCE($1, project_name), description = COALESCE($2, description), project_url = COALESCE($3, project_url), project_thumbnail = $4, project_images = $5 WHERE id = $6 RETURNING *',
+            [
+                project_name || current.project_name,
+                Desicription_ !== undefined ? Desicription_ : current.description,
+                finalUrl !== undefined ? finalUrl : current.project_url,
+                thumbnail,
+                JSON.stringify(images),
+                id
+            ]
+        );
+        const p = queryRes.rows[0];
+
+        res.json({
+            id: p.id,
+            project_name: p.project_name,
+            Desicription_: p.description,
+            project_url: p.project_url,
+            project_link: p.project_url,
+            Project_thumnail: p.project_thumbnail,
+            project_images: p.project_images,
             project_images_: p.project_images,
             created: p.created_at
         });

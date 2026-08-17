@@ -24,7 +24,7 @@ export function generateToken(user) {
             name: user.name
         },
         JWT_SECRET,
-        { expiresIn: '7d' } // Valid for 7 days
+        { expiresIn: '30d' } // Valid for 30 days
     );
 }
 

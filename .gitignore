@@ -30,4 +30,6 @@ dist-ssr
 # Application specific logs and diagnostic files
 server/*.txt
 server/*.log
+server/uploads/
 *.local
+

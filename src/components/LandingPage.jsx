@@ -677,7 +677,27 @@ const LandingPage = ({ onLoginClick, onBookClick }) => {
                                         </div>
                                     </div>
                                 </div>
-                                <p style={{ color: 'rgba(148,163,184,0.85)', fontSize: '1rem', lineHeight: 1.8, flex: 1, whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>{selectedProject.Desicription_}</p>
+                                <div style={{ flex: 1, marginBottom: '2rem' }}>
+                                    <CaseStudyRenderer text={selectedProject.Desicription_} />
+                                </div>
+                                
+                                {(selectedProject.project_url || selectedProject.project_link) && (
+                                    <a
+                                        href={(selectedProject.project_url || selectedProject.project_link).startsWith('http') ? (selectedProject.project_url || selectedProject.project_link) : `https://${selectedProject.project_url || selectedProject.project_link}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            padding: '0.9rem', borderRadius: '14px', background: 'rgba(99,102,241,0.15)',
+                                            border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc',
+                                            fontWeight: 700, fontSize: '0.92rem', textDecoration: 'none', marginBottom: '0.75rem',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <Globe size={16} /> Visit Live Project <ExternalLink size={14} />
+                                    </a>
+                                )}
+
                                 <button onClick={onLoginClick} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1rem' }}>
                                     Start a Similar Project <ArrowRight size={18} />
                                 </button>
@@ -842,5 +862,119 @@ const LandingPage = ({ onLoginClick, onBookClick }) => {
         </div>
     );
 };
+
+function CaseStudyRenderer({ text }) {
+    if (!text || !text.trim()) {
+        return <div style={{ color: '#64748b', fontStyle: 'italic' }}>No project narrative provided.</div>;
+    }
+
+    const raw = text.trim();
+    const sectionPattern = /\*\*([^*]+)\*\*:\s*([\s\S]*?)(?=(\*\*[^*]+\*\*:\s*|$))/g;
+    const sections = [];
+    let match;
+
+    while ((match = sectionPattern.exec(raw)) !== null) {
+        sections.push({
+            title: match[1].trim(),
+            content: match[2].trim()
+        });
+    }
+
+    if (sections.length > 0) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {sections.map((sec, idx) => {
+                    const titleLower = sec.title.toLowerCase();
+                    let badgeBg = 'rgba(99, 102, 241, 0.15)';
+                    let badgeColor = '#818cf8';
+                    let cardBorder = 'rgba(99, 102, 241, 0.2)';
+                    let cardBg = 'rgba(99, 102, 241, 0.03)';
+
+                    if (titleLower.includes('challenge') || titleLower.includes('problem')) {
+                        badgeBg = 'rgba(245, 158, 11, 0.15)';
+                        badgeColor = '#fbbf24';
+                        cardBorder = 'rgba(245, 158, 11, 0.25)';
+                        cardBg = 'rgba(245, 158, 11, 0.03)';
+                    } else if (titleLower.includes('solution') || titleLower.includes('approach')) {
+                        badgeBg = 'rgba(168, 85, 247, 0.15)';
+                        badgeColor = '#c084fc';
+                        cardBorder = 'rgba(168, 85, 247, 0.25)';
+                        cardBg = 'rgba(168, 85, 247, 0.03)';
+                    } else if (titleLower.includes('impact') || titleLower.includes('result') || titleLower.includes('metric')) {
+                        badgeBg = 'rgba(16, 185, 129, 0.15)';
+                        badgeColor = '#34d399';
+                        cardBorder = 'rgba(16, 185, 129, 0.3)';
+                        cardBg = 'rgba(16, 185, 129, 0.04)';
+                    }
+
+                    const isBulletList = sec.content.includes('•') || sec.content.includes('\n-') || sec.content.startsWith('-');
+                    const bullets = isBulletList 
+                        ? sec.content.split(/\n[•\-\*]\s*|^[•\-\*]\s*/).map(s => s.trim()).filter(Boolean)
+                        : [];
+
+                    return (
+                        <div
+                            key={idx}
+                            style={{
+                                background: cardBg,
+                                border: `1px solid ${cardBorder}`,
+                                borderRadius: '16px',
+                                padding: '1.25rem',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', fontWeight: 800, color: badgeColor }}>
+                                {sec.title}
+                            </h4>
+
+                            {isBulletList && bullets.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '0.5rem' }}>
+                                    {bullets.map((b, bIdx) => (
+                                        <div
+                                            key={bIdx}
+                                            style={{
+                                                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                                background: 'rgba(255,255,255,0.03)', padding: '6px 10px',
+                                                borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)'
+                                            }}
+                                        >
+                                            <span style={{ color: badgeColor, fontWeight: 800 }}>✓</span>
+                                            <span style={{ color: 'rgba(226,232,240,0.9)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                                                {b}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p style={{ color: 'rgba(203,213,225,0.85)', fontSize: '0.92rem', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-line' }}>
+                                    {sec.content}
+                                </p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+
+    const paragraphs = raw.split(/\n\n+/);
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            {paragraphs.map((p, pIdx) => {
+                const parts = p.split(/(\*\*[^*]+\*\*)/g);
+                return (
+                    <p key={pIdx} style={{ color: 'rgba(203,213,225,0.85)', fontSize: '0.95rem', lineHeight: 1.75, margin: 0 }}>
+                        {parts.map((part, partIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={partIdx} style={{ color: 'white', fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                        })}
+                    </p>
+                );
+            })}
+        </div>
+    );
+}
 
 export default LandingPage;

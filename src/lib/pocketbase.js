@@ -119,6 +119,13 @@ async function request(path, options = {}) {
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
+        if (response.status === 401 || response.status === 403) {
+            const errorMsg = (errData.error || '').toLowerCase();
+            if (errorMsg.includes('expired') || errorMsg.includes('invalid token') || errorMsg.includes('token required')) {
+                console.warn('🔒 Auth token expired or invalid. Clearing session.');
+                authStoreInstance.clear();
+            }
+        }
         const err = new Error(errData.error || `HTTP error: ${response.status}`);
         err.status = response.status;
         err.data = errData;

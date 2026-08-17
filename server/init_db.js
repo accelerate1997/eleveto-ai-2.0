@@ -106,10 +106,14 @@ const DDL_STATEMENTS = [
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         project_name TEXT NOT NULL,
         description TEXT,
+        project_url TEXT,
         project_images JSONB DEFAULT '[]'::jsonb,
         project_thumbnail TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-    );`
+    );`,
+
+    // 10. Migration: Ensure project_url column exists on portfolios
+    `ALTER TABLE public.portfolios ADD COLUMN IF NOT EXISTS project_url TEXT;`
 ];
 
 export async function initDb() {
